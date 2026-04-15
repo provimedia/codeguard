@@ -127,6 +127,11 @@ Every plan that introduces an API call OR an inbound webhook endpoint MUST speci
 - Why (inbound): `?api_key=` in a webhook URL leaks into Nginx/Apache access logs,
   reverse-proxy logs, browser history, and Referer headers on any redirect. Require
   `$request->header('X-...-Signature')` + constant-time compare, never `$request->query('api_key')`.
+- Why (user-facing download/reset tokens): same leakage surface applies to `?token=` in
+  emailed download/reset/magic-login links. Required: `URL::temporarySignedRoute()` (signature
+  travels in the URL but is bound to the route+expiry and verified server-side), store a SHA-256
+  HASH of the token in the DB (never the raw value), and enforce one-time use via a `consumed_at`
+  column checked+set in a single transaction.
 
 ```php
 // FORBIDDEN — leaks key into exception messages and logs
