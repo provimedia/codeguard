@@ -523,22 +523,17 @@ These catch bugs that live BETWEEN components — not inside any single file, bu
 ### Cross-Layer Data Contracts
 When one layer produces data and another layer consumes it, verify both sides agree.
 
-**Producer → Consumer mismatches:**
-- Backend sends field `status` → Frontend reads `success` → Data silently lost
-- Service returns `{score: 85}` → Controller maps it to `{compatibility: 85}` → View reads `score` → undefined
-- Middleware shares `['flash' => ['status' => ...]]` → Controller sets `->with('success', ...)` → Frontend reads `flash.success` → empty
-- Eloquent accessor not in `$appends` → `paginate()->toArray()` skips it → Vue receives `key: undefined` → renders `href="/undefined"` → 404
-- Subdir-install: Vue calls `router.post('/foo')` (no helper) → resolves to wrong base → 404 silent under MAMP, fine under root domain
+**Producer → Consumer mismatches** (all silent — no error, just missing data):
+- Key rename mid-pipeline: producer emits `status`, consumer reads `success` → null
+- Computed/derived property not opted into the serializer (accessor, virtual attribute, getter, lazy field) → absent from payload, consumer reads undefined
+- Hardcoded path under a subdirectory / reverse-proxy install bypasses the base-URL helper → resolves to wrong base, 404 only in the non-root deployment
 
 **How to check (READING is not enough):**
-1. Trace the data from where it's CREATED to where it's READ
-2. **Dump the actual serialized payload** — curl the route, parse data-page JSON, check that every key the Vue reads has a non-null value
-3. Verify the key names match at every hop
-4. Verify the data structure matches (array vs object, nested keys, null possibility)
+1. Trace the data from where it's CREATED to where it's READ.
+2. **Dump the actual serialized payload** — hit the endpoint, parse the response, prove every consumed key is non-null on the bug path.
+3. Verify key names AND shape (array vs object, nested depth, null possibility) match at every hop.
 
-This is the #1 source of silent bugs — no error, no crash, just missing data.
-
-**Derived-property exposure check:** any time a serializer (`toArray` / `toJSON` / marshal) walks a model whose consumer reads a property that is COMPUTED (accessor, virtual attribute, getter, lazy/`@property` field), verify the serializer opts-in to computed output — otherwise the property is silently absent from the payload and the consumer reads undefined.
+This is the #1 source of silent bugs. Structural-match audits ("producer returns X, consumer reads X") pass while the runtime payload is `{X: undefined}` — dump, don't read.
 
 ### Return Type Completeness
 When a function has conditional branches (if/else, early returns, error paths), verify ALL branches return a compatible type.
