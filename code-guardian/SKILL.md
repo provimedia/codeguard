@@ -305,12 +305,8 @@ After writing code, re-run the consumer grep from Step 1d. For each consumer:
 > is either fixed OR has a justified reason to be exempted.
 >
 > ```bash
-> # After fixing one instance of router.post('/foo', ...) → router.post(url('/foo'), ...)
-> # IMMEDIATELY grep for all unfixed siblings:
-> grep -rn "router\.\(post\|get\|put\|patch\|delete\|visit\)\s*(\s*[\`'\"]/" \
->   resources/js --include='*.vue' --include='*.js' \
->   | grep -v 'url(' \
->   | grep -v 'codeguardian-ok'
+> # After one point-fix, grep the WHOLE pattern across the tree, exclude the fixed form:
+> grep -rn '<unfixed-pattern>' <source-dirs> | grep -v '<fixed-form>' | grep -v 'codeguardian-ok'
 > # Result MUST be empty before claiming the fix is done.
 > ```
 >
