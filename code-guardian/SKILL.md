@@ -439,7 +439,7 @@ Even a 1-line change gets all 5 layers as spot-check. There is no "skip".
 
 **3d. Analyze** — All layers, every time. Intensity per triage:
 
-**DB Integrity** — Fields match live schema? FKs correct? Missing indexes on queried columns? N+1 patterns? ORM attributes match real columns?
+**DB Integrity** — Fields match live schema? FKs correct? Missing indexes on queried columns? N+1 patterns? ORM attributes match real columns? Money/currency stored as integer minor units (cents) or DECIMAL(p,s), NEVER FLOAT/DOUBLE — float rounding silently corrupts totals across aggregation, and `a*b` in float arithmetic is not associative.
 
 **Logic** — Dead code? Unused variables? Unhandled edge cases (null, 0, empty string, empty array)? Missing returns in conditional paths? Off-by-one?
 
