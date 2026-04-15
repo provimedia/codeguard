@@ -315,8 +315,6 @@ Even a 1-line change gets all 5 layers as spot-check. There is no "skip".
 
 **3e. Report**
 
-The report MUST distinguish between **VERIFIED** checks (proven by command output) and **READ** checks (only inspected via reading code). Read-only checks have ~50% false-positive rate based on real bug data — verified checks are the only ones you can trust.
-
 If clean:
 ```
 ✅ [X files | Y lines] clean
