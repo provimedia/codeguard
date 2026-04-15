@@ -647,6 +647,31 @@ EXPLAIN SELECT COUNT(*) FROM <t> WHERE <col> = ?;
 
 **Failure signature**: `key: idx_user_status_created`, `type: ALL`, `rows: 17834221` on `WHERE status = ?` — the planner considered the composite and declined it because `user_id` is leading and unconstrained. Schema reading would have said "status is in an index"; EXPLAIN proves it isn't usable.
 
+### Implicit Coercion Defeating Indexes (type & collation mismatch)
+"The column is indexed" is NOT the same as "a query comparing this column can use the index". If the planner must implicitly convert EITHER side of a comparison to match the OTHER side's type or collation, the index on the converted side becomes unusable — the engine wraps it in an implicit `CONVERT(col USING ...)` or `CAST(col AS ...)` and that expression is not sargable. Schema-reading audits tick the box ("`idx_x` exists"); `EXPLAIN` shows `type: ALL` at production row counts.
+
+Distinct from column-order: here the index IS the leading key_part and there's no range-before-equality problem — the coercion alone kills the seek.
+
+**Three common sources:**
+1. **Type mismatch**: `WHERE bigint_col = '42'` (string literal against BIGINT) or `WHERE varchar_col = 42` (int literal against VARCHAR). Always bind parameters with the correct type; never interpolate a numeric ID as a string.
+2. **Collation mismatch on JOIN**: two tables with different column collations (common after a partial utf8mb4 migration — one table still `utf8_general_ci`). `JOIN ON a.col = b.col` forces a per-row `CONVERT(... USING ...)` on one side → full scan even though both columns are individually indexed.
+3. **Charset mismatch on literal/connection**: connection charset ≠ column charset forces conversion on every comparison.
+
+**Audit reflex** — for every `WHERE col = ?`, `JOIN ON a.x = b.y`, or `IN (...)` in the diff on a string column:
+1. **Does the bound/literal type EXACTLY match the column type?**
+2. **For JOINs on string columns: do BOTH sides share charset AND collation?** Check `information_schema.COLUMNS.CHARACTER_SET_NAME` and `COLLATION_NAME` for both columns — column-level settings override the table default.
+
+**Verification (command output):**
+```sql
+EXPLAIN <query>;
+-- key / type / rows must indicate a real seek, AND Extra must NOT mention CONVERT/CAST wrapping an indexed column.
+
+SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_SET_NAME, COLLATION_NAME
+  FROM information_schema.COLUMNS
+ WHERE TABLE_SCHEMA = DATABASE() AND (TABLE_NAME, COLUMN_NAME) IN (('t1','col'), ('t2','col'));
+-- Both rows MUST match on CHARACTER_SET_NAME AND COLLATION_NAME.
+```
+
 ### Deep-Offset Pagination (LIMIT/OFFSET at depth)
 `LIMIT N OFFSET M` is **O(N+M)**, NOT O(N). The engine walks M+N rows through the chosen index, discards the first M, returns the tail. Under a narrowing predicate (`WHERE user_id = ?` → ~10k rows) the cost is invisible. On a large unpartitioned table with no filter it degrades catastrophically — page 1000 of a 50/page feed touches 50,050 index rows; page 100,000 touches 5M. Each slow request also pins a DB connection, so deep-offset is both latency and pool-exhaustion.
 
