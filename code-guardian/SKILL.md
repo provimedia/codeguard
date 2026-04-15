@@ -663,6 +663,42 @@ Watch for these patterns in any ORM OR external-call loop:
 - Loading full objects when only a count or existence check is needed
 - External HTTP/RPC call inside a row loop — require a bulk endpoint, `Http::pool()`, or justify per-row cost against the row count
 
+### Cache Invalidation Coverage
+Every `Cache::remember($key, ...)` is a promise that EVERY mutation to the underlying data calls `Cache::forget($key)` (or `Cache::tags([...])->flush()`). A cache without invalidation is a bug with a timer.
+
+**The check (VERIFIED, not asserted):** for every cache key introduced or touched by this change, grep EVERY write path to the backing table — controller update/store/destroy, scheduled jobs, queue jobs, inline decrement/increment, raw SQL, tinker scripts — and prove each one invalidates the key.
+
+```bash
+# 1. Find the cache key
+grep -rn "Cache::remember\|Cache::tags" app/ --include='*.php'
+# 2. Find the model/table behind it (e.g. PromoCode)
+# 3. Find EVERY mutation path for that model
+grep -rn "PromoCode::\|->promoCodes\|promo_codes" app/ --include='*.php' \
+  | grep -E "update\(|save\(|delete\(|create\(|insert\(|increment\(|decrement\(|destroy\("
+# 4. For each hit, confirm Cache::forget('<same-key>') OR Cache::tags([...])->flush() is adjacent
+# Result: 0 unguarded mutation paths before claiming the audit passes.
+```
+
+Also check the inverse direction: a scheduled job or queue worker that mutates the DB on a different process than the request cycle must STILL invalidate — shared Redis/Memcached is global, but stale reads don't self-heal.
+
+### Concurrency / TOCTOU on Counters and Quotas
+Any `check-then-act` pattern on a counter (`uses_left`, `stock`, `seats_remaining`, `credits`) is a race unless the check and the mutation happen in ONE atomic SQL statement OR inside `DB::transaction(fn() => Model::lockForUpdate()...)`. Reading from a cache and then decrementing is ALWAYS wrong — the cache value is already stale relative to concurrent requests.
+
+```php
+// WRONG — two concurrent requests both read uses_left=1, both decrement, both succeed
+$promo = Cache::remember(...);
+if ($promo->uses_left > 0) { $promo->decrement('uses_left'); }
+
+// RIGHT — atomic conditional update, check affected rows
+$ok = PromoCode::where('id', $id)
+    ->where('uses_left', '>', 0)
+    ->decrement('uses_left');
+if ($ok === 0) { /* race lost, reject */ }
+```
+
+### Queue Job Idempotency (at-least-once by contract)
+Laravel queues are at-least-once: a worker crash between side-effect and ack causes the SAME job payload to run again. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (unique index on `(aggregate_id, operation_id)`) OR must be provably pure. `Mail::to(...)->send(...)` inside `handle()` with no guard = duplicate email on every retry. Audit reflex: for every `implements ShouldQueue`, name the idempotency key or justify why the job is pure.
+
 ---
 
 ## Self-Tuning
