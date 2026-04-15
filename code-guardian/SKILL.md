@@ -581,6 +581,30 @@ curl -c jar -b jar -s -o /dev/null -D - -d 'email=a&password=b' https://app/logi
 #    Same value → no rotation → session fixation present.
 ```
 
+### Error-Path Log Content Hygiene (PII / secrets in logs)
+Logs are a secondary data store — whatever lands in them inherits the weakest access control on ANY surface the log reaches: file permissions, backups, log-aggregator retention, SaaS vendor access, support screen-shares. An error-path logger that serializes opaque blobs is a secret-leak with a timer.
+
+Distinct from P3 Secrets Hygiene (secrets in URLs / webhook paths) and from Security layer's "sensitive fields in responses" (HTTP responses to callers). This reflex covers what gets written to the LOG sink on the error path.
+
+**Forbidden log payloads** — never serialize wholesale into log lines:
+
+| Blob                              | Why it leaks                                                      |
+|-----------------------------------|-------------------------------------------------------------------|
+| `$_REQUEST` / `$_POST` / `$_GET`  | Arbitrary caller fields: passwords, card numbers, reset tokens    |
+| `$_SERVER` / `getallheaders()`    | `Authorization`, `Cookie`, `X-Api-Key`, any custom auth header    |
+| `$_ENV` / `getenv()` dump         | Every boot-time secret: DB password, webhook signing key, etc.    |
+| Full row from `SELECT *`          | `password_hash`, `api_token_hash`, MFA secret, PII columns        |
+| Raw request body                  | On PII/PAN/credential endpoints, the body IS the secret           |
+| Stack trace with local variables  | Many runtimes bind SQL params and locals in the trace             |
+
+**Audit reflex** — for every log/write call in the diff (error handler, `catch` block, `error_log`, `file_put_contents` to a log path, SIEM hook), answer three questions:
+
+1. **Allowlist or blob?** Payload must be an explicit allowlist of named, non-secret fields (`['user_id' => $id, 'event_id' => $eventId, 'error_class' => get_class($e)]`), never an opaque blob. Blob → BLOCKED.
+2. **Can an UNAUTHENTICATED caller reach this log line?** Pre-auth error paths (bad signature, bad CSRF, bad nonce) let an attacker deliberately trip the path with chosen content — log injection as a reflection primitive.
+3. **Does the row fetched for the log contain columns the logger doesn't need?** `SELECT *` feeding an exception path = latent password_hash leak. Project columns at the query.
+
+Also: append-only log writes without an exclusive lock interleave under concurrency and corrupt downstream parsers — use a logger library that locks per write.
+
 ### Frontend Reactivity Traps
 These cause bugs that no linter catches:
 - **Destructured reactive state**: Extracting values from reactive objects into plain variables loses reactivity. Always use computed/derived state.
