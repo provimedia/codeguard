@@ -664,6 +664,8 @@ UPDATE promo SET uses_left = uses_left - 1 WHERE id = ? AND uses_left > 0;
 
 Audit reflex: for every counter mutation in the diff, name the atomicity mechanism out loud or reject the change.
 
+**`SELECT ... FOR UPDATE` without a transaction is a no-op.** Under autocommit (PDO MySQL default and most driver defaults), each statement is its own transaction — the row lock acquired by `FOR UPDATE` is released the instant the SELECT finishes, BEFORE the follow-up UPDATE runs. The code READS as locked-then-updated but executes as unlocked. Verification: grep every `FOR UPDATE` in the diff and prove a `BEGIN`/`START TRANSACTION` opens before it AND a `COMMIT` closes after the UPDATE. Missing either → the lock is decorative. Same failure applies to advisory locks (`GET_LOCK`) released at session end when the connection is returned to a pool mid-request.
+
 ### Queue/Task Idempotency (at-least-once by contract)
 Virtually every queue/task runner is at-least-once by contract: a worker crash between side-effect and ack re-runs the SAME payload. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (e.g. a `UNIQUE` index on `(aggregate_id, operation_id)`) OR must be provably pure. Unguarded side-effects inside a retry-eligible handler = duplicate side-effect on every retry. Audit reflex: for every enqueued job type in the diff, name the idempotency key or justify purity.
 
