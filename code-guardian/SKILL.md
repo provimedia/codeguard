@@ -619,6 +619,19 @@ Distinct from XSS (HTML body escaping) and P3 (secrets in URLs): this covers dat
 
 Verify: `curl -D -` on the endpoint after injecting a quote-breakout payload at write time; response MUST contain exactly one `Content-Disposition` parameter with no raw `"`, `\r`, `\n`, `\x00`, or non-ASCII outside `filename*=`.
 
+### HTTP Verb Safety for State-Changing Requests (CSRF-on-GET)
+RFC 7231 defines GET and HEAD as **safe** (no side effects) and idempotent. Every mainstream CSRF middleware honours that contract and exempts GET/HEAD from token verification. A route registered as `GET` that mutates state (INSERT/UPDATE/DELETE, mail send, counter bump, external POST) is therefore an **unauthenticated cross-site write primitive** the instant a logged-in victim loads a page the attacker controls: `<img src="https://app/action">` fires the GET with the victim's session cookie (zero-click, no JS, no same-origin restriction). Link prefetchers, email link scanners (Outlook Safe Links, Gmail image proxy, corporate MTAs), and IM link previews (Slack/Discord/Teams) also pre-fetch every URL in their reach — tripping state-changing GETs before the user sees the message.
+
+Distinct from Session Lifecycle (auth boundaries), Open Redirect (destination), Header-Value Injection (header values), Cacheability (cross-user cache replay). This reflex covers the REQUEST VERB vs HANDLER SIDE-EFFECT mismatch.
+
+**Audit reflex** — for every route declaration in the diff:
+1. **Does the handler mutate persistent state or call a side-effecting external API?** Grep the handler body for `UPDATE` / `INSERT` / `DELETE` / `save` / `update` / `delete` / mail send / queue dispatch / external POST. Any match → the route MUST be POST/PUT/PATCH/DELETE, never GET or HEAD.
+2. **Is the verb actually enforced?** A route reachable via a "match any method" / "match get+post" form inherits the GET exemption. Enumerate the registered verbs with the router's introspection command — do NOT read the route file.
+
+**Not a valid defence**: requiring authentication. The victim IS authenticated — that's the whole point of CSRF. Ownership checks also do NOT mitigate: the attacker targets the victim's own row via the victim's own session.
+
+**Valid remediations**: change the verb to POST and require a CSRF token; for email "one-click unsubscribe" RFC 8058 supports `List-Unsubscribe-Post` directly. OR bind the action to a signed, single-use, time-limited token in the URL itself (HMAC of `user_id + action + expiry`, consumed via the Single-Use Resource Consumption reflex; note this trades CSRF risk for URL-leakage risk — P3 applies).
+
 ### Frontend Reactivity Traps
 These cause bugs that no linter catches:
 - **Destructured reactive state**: Extracting values from reactive objects into plain variables loses reactivity. Always use computed/derived state.
