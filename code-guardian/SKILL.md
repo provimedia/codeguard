@@ -36,13 +36,7 @@ Task received
 
 ## PLAN MODE (v5 — born from real bugs that locked in at plan-time)
 
-Bugs that survive the audit phase usually originated in the **plan**. Reading
-the plan back with these reflexes catches problems before any code is written
-and before subagents are dispatched.
-
-**When to run:** After `superpowers:brainstorming` or `superpowers:writing-plans`
-produces a spec/plan, BEFORE any implementation subagent is dispatched. Also
-when receiving a plan from another author.
+Bugs that survive the audit phase usually originated in the plan. Run these 6 reflexes against any spec/plan BEFORE implementation is dispatched — and again when receiving a plan from another author.
 
 **The 6 plan-time reflexes:**
 
@@ -837,14 +831,14 @@ Audit reflex — for every `date()`, `strtotime()`, `DateTime`, `DATE(col)`, `CU
 Silent failure mode: for a same-TZ developer the code works every day in local testing, and breaks only for users in other zones near midnight — invisible until a support ticket from a far-away customer.
 
 ### Open Redirect via Untrusted Return-To URL (`?next=`, `?redirect=`, `?returnTo=`)
-Any endpoint that reads a URL/path from caller input and emits `Location:` (or a meta-refresh, or `window.location = ...`) is an open-redirect primitive unless the target is validated against an allowlist BEFORE the header is sent. Attacker crafts `https://app.example.com/login?next=//evil.com/fake-login`; victim trusts the original domain, logs in, is bounced to the attacker clone, re-enters credentials. Distinct from P3 and Session Lifecycle: this covers the DESTINATION of a caller-controlled redirect.
+Any endpoint that reads a URL/path from caller input and emits `Location:` (meta-refresh or `window.location = ...` count too) is an open-redirect primitive unless the target is allowlisted BEFORE the header is sent. `?next=//evil.com/fake-login` bounces the post-login victim to an attacker clone for credential re-entry. Distinct from P3 and Session Lifecycle: this covers the DESTINATION of a caller-controlled redirect.
 
-**Four traps that all pass a casual code read:**
+**Four payload shapes that bypass naive checks** (all defeated by `parse_url` + host-component equality, NOT by string prefix / regex):
 
-1. **Protocol-relative bypass** — `str_starts_with($next, '/')` treats `//evil.com/x` as relative but `Location: //evil.com/x` resolves to `https://evil.com/x`. Guard: `starts_with('/') AND NOT starts_with('//')`, OR `parse_url` + null host.
-2. **Backslash normalization** — some browsers/proxies normalize `/\evil.com` to `//evil.com`. A regex `^/[^/]` defeats `//` but not `/\`.
-3. **`parse_url` without host assertion** — checking scheme is null is not enough; `//evil.com/x` has no scheme but DOES have a host. Require `parse_url($next, PHP_URL_HOST) === null` OR `=== config('app.host')`.
-4. **Userinfo trick** — `https://app.example.com@evil.com/x` has host `evil.com` but a substring match on 'app.example.com' passes. Never allowlist by substring — parse and compare the HOST component only.
+1. **Protocol-relative** `//evil.com/x` — `starts_with('/')` passes; `Location:` resolves off-host.
+2. **Backslash normalization** `/\evil.com` — some browsers/proxies rewrite to `//evil.com`, defeats `^/[^/]`.
+3. **Empty-scheme with host** `//evil.com/x` — scheme is null but `parse_url(..., PHP_URL_HOST)` is NOT null; assert host null OR equals app host.
+4. **Userinfo** `https://app.example.com@evil.com/x` — substring match on app host passes; actual host is `evil.com`.
 
 **Audit reflex** — for every `Location:` / `redirect($var)` / `location.href = ...` in the diff where the target is derived from request input:
 1. **Allowlist mechanism**: a fixed enum of route names, or `parse_url` host-component equality check against the app host. Regex on raw string → BLOCKED (fails at least one trap above).
