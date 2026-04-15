@@ -224,11 +224,7 @@ FUNCTION: saveUser()
 
 **Output:** Silent. No report. But you now know every place that will break and have planned fixes for all of them.
 
-### Step 2: Write Code
-
-Implement the change AND fix all affected consumers in the same step. Never change a function without updating every caller.
-
-### Step 2b: Post-Change Dependency Verification
+### Step 2: Post-Change Dependency Verification
 
 After writing code, re-run the consumer grep from Step 1d. For each consumer:
 - Open the file, read the call site
