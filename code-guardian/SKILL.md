@@ -678,6 +678,25 @@ Audit reflex: for every counter mutation in the diff, name the atomicity mechani
 ### Queue/Task Idempotency (at-least-once by contract)
 Virtually every queue/task runner is at-least-once by contract: a worker crash between side-effect and ack re-runs the SAME payload. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (e.g. a `UNIQUE` index on `(aggregate_id, operation_id)`) OR must be provably pure. Unguarded side-effects inside a retry-eligible handler = duplicate side-effect on every retry. Audit reflex: for every enqueued job type in the diff, name the idempotency key or justify purity.
 
+### Input Size & Complexity Limits (DoS budget)
+Every untrusted input has three dimensions — **bytes**, **cardinality**, and **complexity** — and ALL three need an explicit cap BEFORE the input reaches code that allocates memory or CPU proportional to it. An uncapped input is a DoS vector with a timer.
+
+Audit reflex — for every new endpoint, webhook, file parser, or upload handler in the diff, name the cap out loud per dimension OR reject the change:
+
+| Dimension           | Vector                                   | Required cap                                                                              |
+|---------------------|------------------------------------------|-------------------------------------------------------------------------------------------|
+| Raw bytes           | JSON body, multipart upload, webhook     | Web-server body limit + per-route override; reject before parsing                         |
+| Array length        | `items: [...]`, bulk-create, ID lists    | `count($arr) <= N` validated BEFORE iteration                                             |
+| Nested depth        | User JSON / YAML / XML                   | Decode with explicit `$depth` (default is often 512, too deep for recursion)              |
+| Decompression ratio | gzip / zip upload, `Content-Encoding`    | Stream-decode with max output bytes; reject ratio > ~100x (zip bomb)                      |
+| Regex input size    | Server-side text validation              | Length cap BEFORE the regex; reject patterns with nested quantifiers (catastrophic backtracking like `(a+)+$`) |
+| Page size           | `?per_page=`, `?limit=`                  | Clamp server-side to a hard max (`min($n, 100)`); NEVER trust client                      |
+| Pixel area          | Image upload, thumbnail generation       | Reject width*height > N BEFORE decode; image bombs allocate on decode, not on read        |
+
+**Two silent failure modes:** (1) OOM under load — cap "works" at p50 because the average payload is tiny, p99.9 takes the worker down and the stack trace points at the allocator, not the missing cap. (2) CPU lock — a regex with nested quantifiers on a 50KB string hangs the worker for minutes with no error, no log, just a queue that stops draining.
+
+Verification: for each new input-accepting endpoint in the diff, produce command output showing behavior at 2x the documented cap — expect 413/422, NOT 500 / OOM / hang.
+
 ### Timezone / Date-Boundary Sanity
 Any code that computes a day-boundary string ("yesterday", "today", "this month") OR compares it to a SQL `DATE(col)` / `CURDATE()` has THREE timezones in play: the PHP process TZ, the DB session TZ, and — if rows are owned by an entity with its own TZ column (tenant, user, venue, subscription) — that entity's TZ. If all three are not explicitly named and aligned, the boundary is wrong at least once per day and twice per DST transition.
 
