@@ -2,7 +2,7 @@
   "iter": 85,
   "max_iter": 100,
   "baseline_score": 68,
-  "last_good_commit": "PENDING",
+  "last_good_commit": "d860139464516c757de305a6c4347e823f5a69f5",
   "consecutive_noops": 0,
   "stop_reason": null,
   "cron_job_id": "14f0db14",
