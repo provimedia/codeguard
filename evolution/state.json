@@ -1,0 +1,12 @@
+{
+  "iter": 0,
+  "max_iter": 100,
+  "baseline_score": null,
+  "last_good_commit": null,
+  "consecutive_noops": 0,
+  "stop_reason": null,
+  "cron_job_id": null,
+  "started_at": "2026-04-15T19:45:00+02:00",
+  "subagent_model": "opus",
+  "gate_mode": "on"
+}
