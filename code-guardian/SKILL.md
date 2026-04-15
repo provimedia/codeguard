@@ -281,14 +281,6 @@ After writing code, re-run the consumer grep from Step 1d. For each consumer:
 - Confirm it works with the new function signature/behavior
 - If you find a consumer you missed → fix it now
 
-```
-VERIFY: saveUser() — 4 consumers
-├── RegisterController.php  → ✅ updated
-├── ProfileController.php   → ✅ updated
-├── AdminUserEdit.php       → ✅ updated
-└── ApiUserController.php   → ❌ MISSED — still passes old params → FIX NOW
-```
-
 ### Step 3: Audit (AFTER writing code) — ALWAYS. NO EXCEPTIONS.
 
 The audit runs every single time code is written or changed. It is never skipped, never deferred, never "done later". The triage determines WHICH layers run at full depth — but every layer runs at minimum as a spot-check.
