@@ -580,6 +580,32 @@ curl -c jar -b jar -s -o /dev/null -D - -d 'email=a&password=b' https://app/logi
 #    Same value → no rotation → session fixation present.
 ```
 
+### HTTP Response Cacheability for Authenticated Pages (shared-proxy cross-user disclosure)
+Any HTTP response whose body depends on caller identity (session cookie, bearer token, API key) is a **per-user** response. Most runtimes emit NO `Cache-Control` by default, and RFC 7234 lets shared caches (reverse proxies, CDNs, corporate forward-proxies, browser bfcache) apply a heuristic freshness lifetime to any 200 OK lacking explicit directives. The cache key is typically `(method, host, path)` — the session cookie is NOT part of the key unless `Vary: Cookie` is present. Result: user A's account statement is stored under `/statement.php` and served verbatim to user B hitting the same URL within the heuristic TTL.
+
+Distinct from "sensitive fields in responses" (WHAT is in the body): this reflex covers WHO ELSE can receive the same body via cache replay.
+
+**Required headers on every authenticated response** (sent BEFORE any body output):
+```
+Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0
+Pragma: no-cache
+Expires: 0
+Vary: Cookie
+```
+`private` alone is insufficient — a misconfigured proxy that ignores `private` still honors `no-store`. `Vary: Cookie` is the belt to `no-store`'s braces.
+
+**Audit reflex** — for every route/page/endpoint in the diff that reads session state or returns user-scoped data:
+1. **What `Cache-Control` does the response emit?** Default / absent → BLOCKED.
+2. **Is `Vary: Cookie` (or `Vary: Authorization` for token auth) set?** Absent → BLOCKED.
+3. **Auth-failure redirects** (302s) are cacheable too — same headers on the redirect response.
+4. **Browser bfcache**: on logout, does the sensitive page still render from bfcache? `no-store` is the only directive that reliably evicts bfcache.
+
+**Verification (command output):**
+```bash
+curl -b jar -s -o /dev/null -D - https://app/statement | grep -iE '^(cache-control|pragma|expires|vary):'
+# Must include: Cache-Control: private, no-store... AND Vary: Cookie. Absent → FAIL.
+```
+
 ### Error-Path Log Content Hygiene (PII / secrets in logs)
 Logs are a secondary data store — whatever lands in them inherits the weakest access control on ANY surface the log reaches: file permissions, backups, log-aggregator retention, SaaS vendor access, support screen-shares. An error-path logger that serializes opaque blobs is a secret-leak with a timer.
 
