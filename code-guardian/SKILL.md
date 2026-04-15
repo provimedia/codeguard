@@ -21,12 +21,6 @@ description: >
 
 # Code Guardian
 
-One skill. Two modes. Zero exceptions.
-
-Born from real bug data: across six development phases, 5 bugs slipped past
-audits that "looked correct". Every iteration of this skill is a tightening of
-the verification reflex — never assert, always verify against command output.
-
 ## Mode Selection
 
 ```
