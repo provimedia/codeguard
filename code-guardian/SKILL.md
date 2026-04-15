@@ -717,6 +717,37 @@ Three acceptable remediations:
 
 Verification: for each handler in the diff, mark each step as L (local) or X (external), point at the L step that must come LAST. If the last step is X and irreversible, the audit is BLOCKED until compensation or reordering is added.
 
+### Error-Path Resource Cleanup (finally-block discipline)
+Distinct from Multi-Step Side-Effect Atomicity (which covers UNDO ordering between 2+ side-effects). This reflex covers SINGLE resources whose lifetime must span every exit path — happy return, early return, AND every throw reachable from the acquire. A release call that sits on the happy path AFTER the work leaks the resource on every non-happy exit.
+
+PDO's transaction state is the most dangerous case: PHP does NOT auto-rollback on exception, so a throw between `beginTransaction()` and `commit()` leaves the connection with an open transaction. When the connection returns to a pool or long-running worker, the next unrelated query runs inside the stale transaction and either auto-commits partial writes or is silently rolled back by the next `beginTransaction()`.
+
+**Resources that leak on throw unless released in `finally` (or a catch that releases before re-throwing):**
+
+| Resource                          | Release call                                              |
+|-----------------------------------|-----------------------------------------------------------|
+| PDO transaction                   | `$pdo->rollBack()` in catch, `commit()` only on success   |
+| File handle (`fopen`, `tmpfile`)  | `fclose`                                                  |
+| Advisory lock (`GET_LOCK`, `flock`) | `RELEASE_LOCK` / `flock(LOCK_UN)`                       |
+| Temp file / directory             | `unlink` / `rmdir`                                        |
+| Process / pipe (`proc_open`)      | `proc_close` + close stdin/out/err                        |
+| External keep-alive connection    | framework-specific close                                  |
+
+**Audit reflex** — for every resource-acquiring call in the diff, draw the function's exit graph (happy return, early return, every throw reachable from the acquire — INCLUDING throws inside library calls that consume the resource) and answer out loud for EACH exit: **"Is the release call reached on this exit?"** The only safe answer on all exits simultaneously is `try { ... } finally { release(); }` wrapping the acquire, OR a catch that releases before re-throwing.
+
+**PDO-transaction canonical fix:**
+```php
+$pdo->beginTransaction();
+try {
+    $stmt->execute([...]);
+    $pdo->commit();
+} catch (\Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+    throw $e;
+}
+```
+(The `inTransaction()` guard prevents masking the original exception when an implicit commit — e.g. DDL in MySQL — already closed the transaction.)
+
 ### Long-Running Data Backfill Shape (undo log, resumability, replica lag)
 One-shot data migrations and backfill commands fail in three ways that no query-correctness reflex catches. Distinct from P2 (READ streaming), from deep-offset pagination (LIMIT/OFFSET shape), and from queue idempotency (retry of the same payload). This reflex is about the OPERATIONAL shape of a handler that mutates N million rows in one run.
 
