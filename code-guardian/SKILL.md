@@ -667,6 +667,22 @@ Audit reflex: for every counter mutation in the diff, name the atomicity mechani
 ### Queue/Task Idempotency (at-least-once by contract)
 Virtually every queue/task runner is at-least-once by contract: a worker crash between side-effect and ack re-runs the SAME payload. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (e.g. a `UNIQUE` index on `(aggregate_id, operation_id)`) OR must be provably pure. Unguarded side-effects inside a retry-eligible handler = duplicate side-effect on every retry. Audit reflex: for every enqueued job type in the diff, name the idempotency key or justify purity.
 
+### Multi-Step Side-Effect Atomicity (saga / compensation)
+A single handler that performs 2+ side-effects — even without concurrency or retries — is a saga. If any step after the first throws and nothing undoes the earlier steps, the system is left in a partial state no error log reconciles: customer charged with no order row, file written with no DB record, email referencing a row that doesn't exist.
+
+Distinct from Queue Idempotency (same payload across retries) and TOCTOU (concurrent races). This is ONE request, sequential steps, partial-commit window between them.
+
+**Audit reflex** — for every handler in the diff with 2+ side-effects (local write, external API, payment, file write, email, queue dispatch, cache mutation), enumerate steps IN ORDER and for each transition answer out loud: **"If step N+1 throws, what automatically undoes step N?"** If the answer is "nothing" for any transition, the handler is broken.
+
+Three acceptable remediations:
+1. **Single atomic boundary** — all steps inside ONE DB transaction, zero external side-effects inside. Only works when every step is a local DB write.
+2. **External-last ordering** — reorder so the irreversible external step (payment, email, third-party POST) runs AFTER all local writes commit. A throw on the external step still fails the request, but local state stays consistent and retriable. Usually the minimal fix.
+3. **Explicit compensation** — wrap each external step in a try/catch whose catch calls the documented undo (refund, reversal, delete). The compensation itself must be idempotent and logged.
+
+**Anti-pattern**: `local decrement → external charge → INSERT order` — if the INSERT throws (unique-index conflict, lock timeout, disk full), the customer is charged with no order row and no refund. Fix: INSERT with `status='pending'` FIRST, then charge, then UPDATE to `status='paid'`. The confirmation email moves AFTER commit.
+
+Verification: for each handler in the diff, mark each step as L (local) or X (external), point at the L step that must come LAST. If the last step is X and irreversible, the audit is BLOCKED until compensation or reordering is added.
+
 ### Input Size & Complexity Limits (DoS budget)
 Every untrusted input has three dimensions — **bytes**, **cardinality**, and **complexity** — and ALL three need an explicit cap BEFORE the input reaches code that allocates memory or CPU proportional to it. An uncapped input is a DoS vector with a timer.
 
