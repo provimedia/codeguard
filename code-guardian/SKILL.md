@@ -729,7 +729,7 @@ UPDATE promo SET uses_left = uses_left - 1 WHERE id = ? AND uses_left > 0;
 -- PHP then checks PDOStatement::rowCount(); 0 = race lost, reject.
 ```
 
-Audit reflex: for every counter mutation in the diff, name the atomicity mechanism out loud or reject the change.
+Audit reflex: for every counter mutation in the diff, name the atomicity mechanism out loud or reject the change. Same reflex for business-key uniqueness (invoice number, slug, SKU, external reference, tenant-scoped sequence): SELECT-MAX / SELECT-by-key followed by INSERT is a race unless a `UNIQUE` index on the key catches the collision AND the handler catches the duplicate-key error and retries — the SELECT alone proves nothing, both concurrent callers see the same max and both INSERT. Wrapping in a transaction does NOT help: under InnoDB REPEATABLE READ the SELECT is a consistent snapshot and the INSERT has nothing to collide with at the row level.
 
 **`SELECT ... FOR UPDATE` without a transaction is a no-op.** Under autocommit (PDO MySQL default and most driver defaults), each statement is its own transaction — the row lock acquired by `FOR UPDATE` is released the instant the SELECT finishes, BEFORE the follow-up UPDATE runs. The code READS as locked-then-updated but executes as unlocked. Verification: grep every `FOR UPDATE` in the diff and prove a `BEGIN`/`START TRANSACTION` opens before it AND a `COMMIT` closes after the UPDATE. Missing either → the lock is decorative. Same failure applies to advisory locks (`GET_LOCK`) released at session end when the connection is returned to a pool mid-request.
 
