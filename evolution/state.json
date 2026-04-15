@@ -1,8 +1,8 @@
 {
-  "iter": 40,
+  "iter": 41,
   "max_iter": 100,
   "baseline_score": 68,
-  "last_good_commit": "8fe544aa9a5c0088bbb3c6d770ca4151cc61a452",
+  "last_good_commit": "PENDING",
   "consecutive_noops": 0,
   "stop_reason": null,
   "cron_job_id": "14f0db14",
@@ -10,13 +10,12 @@
   "subagent_model": "opus",
   "gate_mode": "v4_verified",
   "direction": "generality_php_mysql_substrate",
-  "skill_md_lines": 846,
+  "skill_md_lines": 836,
   "last_benchmark": {
     "iter": 40,
     "fixture": "fixture-01.md",
     "passed": true,
     "caught": 5,
-    "expected": 4,
-    "note": "zero regression across 29 edits since iter-10"
+    "expected": 4
   }
 }

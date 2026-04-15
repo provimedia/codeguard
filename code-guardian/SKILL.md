@@ -120,24 +120,14 @@ Every plan that introduces an API call OR an inbound webhook endpoint MUST speci
 `?api_key=`, `?token=`. If found, reject the plan section and require header-based
 auth instead.
 
-### P4. config:cache Safety
+### P4. Cached-Config Safety
 
-Every plan that introduces a new env var MUST specify access via
-`config('namespace.key')`, NEVER `env('VAR')` outside `config/*.php` files.
-
-```php
-// FORBIDDEN — returns null when production runs `php artisan config:cache`
-$key = env('GEMINI_API_KEY');
-
-// REQUIRED — survives config:cache
-// 1. Add to config/services.php:
-'gemini' => ['key' => env('GEMINI_API_KEY')],
-// 2. Read via:
-$key = config('services.gemini.key');
-```
-
-**Verification during plan review:** if the plan's pseudocode contains
-`env('...')` outside a config file, reject it and require a config block.
+Runtimes that pre-compile config at boot snapshot env vars ONCE. Reading
+env vars directly from application code (outside the config layer) returns
+null after boot-time caching. Every plan that introduces a new env var
+MUST route access through the project's config layer, not a raw env read
+at the call site. Verification: grep the plan's pseudocode for direct env
+reads outside config files; any match → reject.
 
 ### P5. Pattern Source Quality Check
 
