@@ -591,21 +591,7 @@ When one layer produces data and another layer consumes it, verify both sides ag
 
 This is the #1 source of silent bugs — no error, no crash, just missing data.
 
-**The Eloquent Accessor Trap (most common, hardest to spot):**
-```php
-// Model has this:
-public function getLocalPathAttribute(): string { return "/{$this->slug}"; }
-
-// But MISSES this:
-protected $appends = ['local_path'];   // ← without this, paginator skips it
-
-// Result: paginate()->toArray() returns rows WITHOUT local_path → Vue renders /undefined
-```
-
-The check: any time you have a controller method that uses `paginate()`, `->get()`, or
-`->toArray()` and the Vue side reads a property that's a model accessor (computed from other
-fields), VERIFY the property is in `$appends` OR is being explicitly mapped via `->map()` in
-the controller.
+**Derived-property exposure check:** any time a serializer (`toArray` / `toJSON` / marshal) walks a model whose consumer reads a property that is COMPUTED (accessor, virtual attribute, getter, lazy/`@property` field), verify the serializer opts-in to computed output — otherwise the property is silently absent from the payload and the consumer reads undefined.
 
 ### Return Type Completeness
 When a function has conditional branches (if/else, early returns, error paths), verify ALL branches return a compatible type.
