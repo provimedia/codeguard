@@ -99,22 +99,11 @@ on expected row count:
 | 1000 – 100k  | `->cursor()` (preferred) or `->lazy(N)` | Streams without OOM          |
 | 100k+        | `->lazyById(N)` + dedicated job queue | Resilient to crashes         |
 
-**Critical Laravel gotcha:** `->lazy($size)` internally uses `forPage()` which
-**OVERRIDES** any user-supplied `->limit()`. If the plan needs both a `limit()`
-clause AND streaming, use `->cursor()`. `->lazy()` only works when there's no
-limit (or the limit is the chunk size itself).
-
-```php
-// BROKEN — limit(2) is silently ignored, processes ALL matching rows
-ShopProduct::whereNull('x')->limit(2)->lazy(500);
-
-// CORRECT — cursor() respects all preceding constraints in a single SQL query
-ShopProduct::whereNull('x')->limit(2)->cursor();
-```
-
-**Real bug from this session:** Plan specified `->get()` for a 16k-row table.
-First-attempt fix used `->lazy(500)` which then ignored the test's `--limit=2`,
-processing 150+ products before being killed. Final fix used `->cursor()`.
+**Gotcha:** some streaming primitives silently override upstream row limits
+(internal pagination re-drives the query and ignores an earlier `LIMIT` / take).
+If the plan needs BOTH streaming AND a hard cap, either pick a primitive that
+respects both OR apply the cap server-side — and verify the actual row count
+processed, not the primitive name you picked.
 
 ### P3. Secrets Hygiene for API Calls
 
