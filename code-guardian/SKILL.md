@@ -105,6 +105,13 @@ If the plan needs BOTH streaming AND a hard cap, either pick a primitive that
 respects both OR apply the cap server-side — and verify the actual row count
 processed, not the primitive name you picked.
 
+**Aggregate trap:** `SUM` / `COUNT` / `AVG` / `MAX` / `MIN` look O(1) but
+scan rows. Three failure modes on large tables: (1) no `WHERE` narrowing, so
+the aggregate walks the full history every call; (2) the filtered column has
+no covering index, so even a narrow `WHERE` still full-scans; (3) computed
+live per request where a denormalized counter or materialized rollup would
+do. Verify with `EXPLAIN`: index is used AND the row estimate is bounded.
+
 ### P3. Secrets Hygiene for API Calls
 
 Every plan that introduces an API call OR an inbound webhook endpoint MUST specify:
