@@ -1,5 +1,5 @@
 {
-  "iter": 9,
+  "iter": 10,
   "max_iter": 100,
   "baseline_score": 11,
   "last_good_commit": "e6514782fbc5a7c51fada0040acc312038cf404b",
@@ -10,5 +10,12 @@
   "subagent_model": "opus",
   "gate_mode": "v3_generality",
   "direction": "generality_php_mysql_substrate",
-  "skill_md_lines": 734
+  "skill_md_lines": 734,
+  "last_benchmark": {
+    "iter": 10,
+    "fixture": "fixture-01.md",
+    "passed": true,
+    "caught": 5,
+    "expected": 4
+  }
 }
