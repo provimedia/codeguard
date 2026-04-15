@@ -1,1 +1,2 @@
 {"iter":1,"ts":"2026-04-15T19:50:00+02:00","mode":"free","task":"Featured Partner badge with auto-expiry sync command","score":3,"baseline":null,"action":"edit","report":"iterations/iter-001.md","agent_model":"opus","bugs_planted":7,"bugs_caught":6,"friction_notes":3,"token_cost":"high"}
+{"iter":2,"ts":"2026-04-15T20:03:00+02:00","mode":"free","task":"Refund-Eligibility Webhook + Sync for B2B Invoicing SaaS","score":7,"baseline":3,"action":"edit","report":"iterations/iter-002.md","agent_model":"opus","bugs_planted":8,"bugs_caught":8,"friction_notes":3,"token_cost":"medium"}

@@ -120,10 +120,13 @@ processing 150+ products before being killed. Final fix used `->cursor()`.
 
 ### P3. Secrets Hygiene for API Calls
 
-Every plan that introduces an external API call MUST specify:
-- API key passed via **header**, NEVER query string
-- Why: Guzzle exception messages include the full URL; URL-key leaks into
+Every plan that introduces an API call OR an inbound webhook endpoint MUST specify:
+- API key / shared secret passed via **header**, NEVER query string — in BOTH directions
+- Why (outbound): Guzzle exception messages include the full URL; URL-key leaks into
   `storage/logs/laravel.log` on any HTTP failure.
+- Why (inbound): `?api_key=` in a webhook URL leaks into Nginx/Apache access logs,
+  reverse-proxy logs, browser history, and Referer headers on any redirect. Require
+  `$request->header('X-...-Signature')` + constant-time compare, never `$request->query('api_key')`.
 
 ```php
 // FORBIDDEN — leaks key into exception messages and logs
