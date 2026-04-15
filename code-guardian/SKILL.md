@@ -121,26 +121,18 @@ processing 150+ products before being killed. Final fix used `->cursor()`.
 ### P3. Secrets Hygiene for API Calls
 
 Every plan that introduces an API call OR an inbound webhook endpoint MUST specify:
-- API key / shared secret passed via **header**, NEVER query string — in BOTH directions
-- Why (outbound): Guzzle exception messages include the full URL; URL-key leaks into
-  `storage/logs/laravel.log` on any HTTP failure.
-- Why (inbound): `?api_key=` in a webhook URL leaks into Nginx/Apache access logs,
+- API key / shared secret passed via **header**, NEVER query string — in BOTH directions.
+- Why (outbound): HTTP-client exceptions typically include the full URL; a URL-embedded
+  key leaks into application error logs on any failure.
+- Why (inbound): `?api_key=` in a webhook URL leaks into web-server access logs,
   reverse-proxy logs, browser history, and Referer headers on any redirect. Require
-  `$request->header('X-...-Signature')` + constant-time compare, never `$request->query('api_key')`.
+  the signature in a header (not the query string) and compare with a constant-time
+  equality function.
 - Why (user-facing download/reset tokens): same leakage surface applies to `?token=` in
-  emailed download/reset/magic-login links. Required: `URL::temporarySignedRoute()` (signature
-  travels in the URL but is bound to the route+expiry and verified server-side), store a SHA-256
-  HASH of the token in the DB (never the raw value), and enforce one-time use via a `consumed_at`
-  column checked+set in a single transaction.
-
-```php
-// FORBIDDEN — leaks key into exception messages and logs
-Http::post("https://api.example.com/v1/foo?key={$apiKey}", [...]);
-
-// REQUIRED — key stays in headers, never in URL
-Http::withHeaders(['x-api-key' => $apiKey])
-    ->post("https://api.example.com/v1/foo", [...]);
-```
+  emailed download/reset/magic-login links. Use a signed, time-limited URL mechanism
+  (signature travels in the URL but is bound to route+expiry and verified server-side),
+  store a SHA-256 HASH of the token in the DB (never the raw value), and enforce
+  one-time use via a `consumed_at` column checked+set in a single transaction.
 
 **Verification during plan review:** grep the plan's pseudocode for `?key=`,
 `?api_key=`, `?token=`. If found, reject the plan section and require header-based
