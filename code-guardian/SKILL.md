@@ -680,6 +680,18 @@ Audit reflex: for every counter mutation in the diff, name the atomicity mechani
 ### Queue/Task Idempotency (at-least-once by contract)
 Virtually every queue/task runner is at-least-once by contract: a worker crash between side-effect and ack re-runs the SAME payload. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (e.g. a `UNIQUE` index on `(aggregate_id, operation_id)`) OR must be provably pure. Unguarded side-effects inside a retry-eligible handler = duplicate side-effect on every retry. Audit reflex: for every enqueued job type in the diff, name the idempotency key or justify purity.
 
+### Timezone / Date-Boundary Sanity
+Any code that computes a day-boundary string ("yesterday", "today", "this month") OR compares it to a SQL `DATE(col)` / `CURDATE()` has THREE timezones in play: the PHP process TZ, the DB session TZ, and — if rows are owned by an entity with its own TZ column (tenant, user, venue, subscription) — that entity's TZ. If all three are not explicitly named and aligned, the boundary is wrong at least once per day and twice per DST transition.
+
+Audit reflex — for every `date()`, `strtotime()`, `DateTime`, `DATE(col)`, `CURDATE()`, `NOW()`, or `BETWEEN` over datetimes in the diff:
+- Name the TZ of the producer (PHP default vs explicit `new DateTimeZone(...)`).
+- Name the TZ of the consumer (DB session `@@time_zone`, or the entity's TZ column).
+- Prove they match, OR that the comparison uses `CONVERT_TZ(col, @@session.time_zone, ?)` with the entity TZ bound as a parameter.
+- For recurring-event generation or "N days from now" math, verify DST: spring-forward and fall-back make `+1 day` non-equivalent to `+86400 seconds`.
+- Store timestamps as UTC (or a single fixed zone) in the DB; do day-grouping in the READER's TZ, not the server's.
+
+Silent failure mode: for a same-TZ developer the code works every day in local testing, and breaks only for users in other zones near midnight — invisible until a support ticket from a far-away customer.
+
 ---
 
 ## Self-Tuning
