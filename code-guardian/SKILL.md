@@ -643,6 +643,26 @@ Watch for these patterns in any ORM OR external-call loop:
 - Loading full objects when only a count or existence check is needed
 - External HTTP/RPC call inside a row loop — require a bulk endpoint, a parallel-request primitive (concurrent fan-out), or justify per-row cost against the row count
 
+### Composite Index Column-Order (leading-column rule)
+"Column X appears in an index" is NOT the same as "a query on X can use that index". A composite index `(A, B, C)` is a B-tree keyed on A first, then B within each A, then C within each (A,B). The engine can only seek the tree for predicates that include the LEADING column — `WHERE A = ?`, `WHERE A = ? AND B = ?`, `WHERE A = ? AND B > ?`. A bare `WHERE B = ?` or `WHERE C = ?` cannot seek and degrades to a full scan. (Skip-scan exists in some engines but is narrow and planner-dependent — never assume it.)
+
+Distinct from "missing index": the index exists, the queried column appears in it, a schema-reading audit ticks the box, and the query still full-scans at 10M+ rows.
+
+**Audit reflex** — for every `WHERE col = ?` / `WHERE col IN (...)` / `ORDER BY col` / `GROUP BY col` in the diff, do NOT stop at "col is listed in some index". Answer two questions out loud:
+
+1. **Is `col` the LEADING key_part of an index, OR does the same query constrain every earlier key_part to an equality?** If neither, no index is usable — name the leading-matching index, or add one.
+2. **Range-before-equality trap.** An index `(created_at, user_id)` used for `WHERE user_id = ? AND created_at > ?` can only seek the range on `created_at`; the later equality becomes a filter, not a seek. Put equality columns FIRST and range columns LAST.
+
+**Verification (command output, not schema reading):**
+```sql
+EXPLAIN SELECT COUNT(*) FROM <t> WHERE <col> = ?;
+-- `key`  column: must name an index whose FIRST key_part is <col> (or earlier key_parts all equality-constrained by this query).
+-- `type` column: must be ref / eq_ref / range / const — NOT `ALL` and NOT `index`.
+-- `rows` column: bounded (small multiple of result set), NOT ≈ table row count.
+```
+
+**Failure signature**: `key: idx_user_status_created`, `type: ALL`, `rows: 17834221` on `WHERE status = ?` — the planner considered the composite and declined it because `user_id` is leading and unconstrained. Schema reading would have said "status is in an index"; EXPLAIN proves it isn't usable.
+
 ### Deep-Offset Pagination (LIMIT/OFFSET at depth)
 `LIMIT N OFFSET M` is **O(N+M)**, NOT O(N). The engine walks M+N rows through the chosen index, discards the first M, returns the tail. Under a narrowing predicate (`WHERE user_id = ?` → ~10k rows) the cost is invisible. On a large unpartitioned table with no filter it degrades catastrophically — page 1000 of a 50/page feed touches 50,050 index rows; page 100,000 touches 5M. Each slow request also pins a DB connection, so deep-offset is both latency and pool-exhaustion.
 
