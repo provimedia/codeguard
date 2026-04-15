@@ -642,6 +642,23 @@ Watch for these patterns in any ORM OR external-call loop:
 - Loading full objects when only a count or existence check is needed
 - External HTTP/RPC call inside a row loop — require a bulk endpoint, a parallel-request primitive (concurrent fan-out), or justify per-row cost against the row count
 
+### Deep-Offset Pagination (LIMIT/OFFSET at depth)
+`LIMIT N OFFSET M` is **O(N+M)**, NOT O(N). The engine walks M+N rows through the chosen index, discards the first M, returns the tail. Under a narrowing predicate (`WHERE user_id = ?` → ~10k rows) the cost is invisible. On a large unpartitioned table with no filter it degrades catastrophically — page 1000 of a 50/page feed touches 50,050 index rows; page 100,000 touches 5M. Each slow request also pins a DB connection, so deep-offset is both latency and pool-exhaustion.
+
+**Audit reflex** — for every `LIMIT ? OFFSET ?` in the diff, answer three questions out loud:
+
+1. **What narrows the scan BEFORE the OFFSET?** Name the WHERE predicate and prove an index covers it AND bounds the filtered set to a small multiple of page size. No narrowing WHERE → unbounded.
+2. **Is the filtered set itself bounded?** If unbounded (global firehose, audit log, telemetry, append-only table without retention), OFFSET is NOT acceptable — use keyset pagination: `WHERE (created_at, id) < (?, ?) ORDER BY created_at DESC, id DESC LIMIT N`. Cost stays O(N) regardless of depth.
+3. **Is the `page` parameter capped?** `?page=999999999` on a large table forces a walk of the entire index — a one-request DoS. Clamp `page` like you clamp `per_page`.
+
+**Verification** (command output, not code reading):
+```sql
+EXPLAIN SELECT id FROM <t> WHERE <pred> ORDER BY <col> DESC LIMIT 50 OFFSET 500000;
+-- `rows` must NOT be ≈ 500050. If it is, the query is O(offset) and FAILS.
+```
+
+**Copy-paste trap**: a safe OFFSET paginator over a narrow predicate is often copy-pasted into a global-firehose variant by dropping the WHERE — identical shape, runtime cost differs by 4+ orders of magnitude. "Follow the existing pagination pattern" is safe ONLY if the new call site keeps the source's narrowing predicate; LIMIT/OFFSET shape alone is never what makes a paginator safe on a large table.
+
 ### Cache Invalidation Coverage
 Every cached read is a promise that EVERY mutation to the backing data also invalidates the cache entry. A cache without invalidation is a bug with a timer.
 
