@@ -1,7 +1,21 @@
-# Code Guardian Evolution Loop — Iteration Runner
+# Code Guardian Evolution Loop — Iteration Runner (v2)
 
-This file is executed by a Claude Code session fired by cron every 10 minutes.
+This file is executed by a Claude Code session fired by cron every 3 minutes.
 Each run = one iteration of the skill's self-improvement loop.
+
+## What changed in v2
+- **Score-based gate removed.** The old rule `score >= baseline` blocked legitimate
+  edits on harder tasks (iters 4–5 missed TOCTOU / cache / queue gaps but couldn't
+  land fixes because their raw score was below baseline). Score is now **logged,
+  not gated**.
+- **Structural gate only** for free mode: edit must exist, old_string must be
+  unique, post-edit structure must still parse (frontmatter + PLAN MODE marker).
+- **Benchmark mode = pure regression test** every 10th iter: simulate the current
+  skill against a pinned fixture, compare bugs caught to the fixture's minimum
+  threshold, revert to `last_good_commit` on regression. No edits applied in
+  benchmark iters.
+- **Consecutive noops** only increment on **free-mode** noops (subagent returned
+  null, or edit was structurally rejected). Benchmark iters don't count.
 
 ---
 
@@ -15,9 +29,9 @@ Each run = one iteration of the skill's self-improvement loop.
 Touch only `/Applications/MAMP/htdocs/code_guard`. Do NOT deploy to
 `~/.claude/skills/code-guardian/`. Deployment is a manual step.
 
-### Gate
-Apply a `SKILL.md` edit ONLY if the score is >= baseline. On benchmark regression,
-revert to the last good commit. "Always edit" is forbidden — it causes drift.
+### Drift protection
+The only real drift guard is the benchmark fixture run every 10 iterations. Do
+NOT over-protect with per-iter score comparisons — that blocks real improvements.
 
 ---
 
@@ -35,9 +49,10 @@ revert to the last good commit. "Always edit" is forbidden — it causes drift.
 ## Algorithm
 
 ### 1. Read state
-Read `evolution/state.json`. Extract:
+Parse `evolution/state.json`. Extract:
 `iter`, `max_iter`, `baseline_score`, `last_good_commit`, `consecutive_noops`,
-`stop_reason`, `cron_job_id`.
+`stop_reason`, `cron_job_id`. (`baseline_score` is now "highest score seen so far"
+— informational only, not a gate.)
 
 ### 2. Check stop conditions
 - `stop_reason != null` → print `"loop already stopped: {reason}"`, exit.
@@ -62,9 +77,7 @@ Read `code-guardian/SKILL.md` into `skill_contents`. This is the version under t
 Use the `Agent` tool with:
 - `subagent_type: "general-purpose"`
 - `model: "opus"` ← **MANDATORY — do not omit, do not change**
-- `description: "Red-team iter N"`
-- `prompt`: the block below, with `{N}`, `{skill_contents}`, and (benchmark mode)
-  `{fixture_contents}` substituted verbatim.
+- `description: "Red-team iter N"` (free) or `"Benchmark iter N"`
 
 ---
 
@@ -72,170 +85,203 @@ Use the `Agent` tool with:
 
 ```
 You are the red-team evaluator for the code-guardian Claude Code skill.
-Iteration: {N} / 100.
+Iteration: {N} / 100. Mode: free.
+
+FIRST: Read `/Applications/MAMP/htdocs/code_guard/code-guardian/SKILL.md` in full.
 
 ## Your job
 
 1. INVENT a realistic, NEW Laravel 11 + Vue 3 + MySQL task. Requirements:
-   - Include 5+ concrete code snippets (migration, model, controller, resource,
-     Vue component, config, helper — pick at least 5)
-   - Plant 3+ subtle, realistic bugs that a code-guardian-armed session should catch
-   - The task must exercise at least 5 of: P1 (cross-layer trace), P2 (scale),
-     P3 (secrets hygiene), P4 (config:cache safety), P5 (pattern source quality),
-     P6 (WIP staging discipline), any of the 7-point audit checks, debug-mode
-   - Do NOT reuse scenarios from prior iterations. Be creative each run.
-   - The task must be different from the benchmark fixtures (no helpful_text on
-     Product, no admin API key in URL, no same_site=strict mobile bug).
+   - 5+ concrete code snippets (migration, model, controller, resource, Vue,
+     config, helper, command, middleware — pick at least 5)
+   - 3+ subtle, realistic bugs that a code-guardian-armed session should catch
+   - Exercise >= 5 of: P1 (cross-layer), P2 (scale), P3 (secrets), P4 (config:cache),
+     P5 (pattern source), P6 (WIP staging), 7-point audit, debug-mode
+   - Do NOT reuse prior iterations' scenarios (caller will list reserved ones)
 
-2. Write a GROUND TRUTH block (hidden from the simulation step): list planted bugs,
-   triggers that should fire, forbidden phrases, minimum score expectation.
+2. Write the GROUND TRUTH block: list planted bugs, triggers, forbidden phrases.
 
 3. SIMULATE: roleplay step-by-step what a Claude Code session armed with the
-   SKILL.md below would ACTUALLY produce when handed this task. Be honest —
-   include moments where the skill helps AND moments where it fails, feels
-   verbose, produces redundant output, or misses a bug. Do NOT cheat by peeking
-   at the ground truth.
+   SKILL.md would produce. Be honest — include hits, misses, friction.
 
-4. EVALUATE the simulation against the ground truth. Compute:
+4. EVALUATE — compute and log (NO gate on these numbers):
    - bugs_planted, bugs_caught
-   - bugs_missed: list of {bug, why_missed} — why did the skill fail to catch it?
+   - bugs_missed: list of {bug, why_missed}
    - forbidden_phrases_count
-   - friction_notes: list of SKILL.md sections that felt redundant, verbose,
-     or got in the way during the simulation
-   - token_cost: "high" | "medium" | "low"
-   - score = bugs_caught - 2*len(bugs_missed) - 2*forbidden_phrases_count
-             - (len(friction_notes) >= 3 ? 1 : 0)
+   - friction_notes: sections that felt redundant, verbose, or in-the-way
+   - token_cost: high | medium | low
+   - score = bugs_caught - 2*len(bugs_missed) - 2*forbidden_phrases - (1 if len(friction_notes)>=3 else 0)
+   - **The score is DIAGNOSTIC. It is logged for trend analysis, not used to gate
+     your edit.** Propose the best edit you can find regardless of the raw score.
 
-5. PROPOSE ONE MINIMAL EDIT to SKILL.md that would fix the #1 failure mode from
-   this iteration. The edit MUST be:
-   - Concrete: exact `old_string` (verbatim slice from SKILL.md below) and `new_string`
-   - Minimal: smallest diff that fixes the issue
-   - Token-aware: prefer tightening or replacing existing text over appending
-   - Net-improving: do not add yet-another-warning that duplicates existing content
-   - `old_string` must appear EXACTLY ONCE in SKILL.md (for a clean Edit-tool replacement)
-   - If the skill already handles this case OR no edit clearly improves things,
-     return `"proposed_edit": null`
+5. PROPOSE ONE MINIMAL EDIT that addresses the #1 failure mode OR friction
+   observed in this iteration. The edit MUST be:
+   - Concrete: exact `old_string` (verbatim slice from the actual SKILL.md you
+     read — copy-paste precise) and `new_string`
+   - Minimal: smallest diff that addresses the issue
+   - Token-aware: prefer tightening / replacing / deduplicating existing text
+     over appending new warnings
+   - Net-improving: do NOT add a warning that duplicates existing guidance
+   - `old_string` must appear EXACTLY ONCE in SKILL.md
+   - If the skill already handles this case well AND you see no real friction
+     to reduce → return `"proposed_edit": null`. This is valid and often correct.
+     But do NOT return null just because your simulation missed some bugs — if
+     there is a real gap, propose the fix. The main loop will decide whether to
+     apply it based on structural checks, not on your score.
 
 ## Output format
 
-End your response with EXACTLY this JSON (wrapped in a single ```json fence,
-nothing after it):
+Write a detailed report. END your response with EXACTLY this JSON in a single
+```json fence, nothing after:
 
 ```json
 {
   "iter": N,
   "mode": "free",
-  "task_title": "short title",
-  "task_description": "2-3 sentence summary",
-  "triggers_expected": ["P1","P4","audit-1"],
-  "triggers_hit_in_sim": ["P1"],
-  "bugs_planted": 3,
-  "bugs_caught": 1,
+  "task_title": "...",
+  "task_description": "...",
+  "triggers_expected": ["..."],
+  "triggers_hit_in_sim": ["..."],
+  "bugs_planted": 0,
+  "bugs_caught": 0,
   "bugs_missed": [{"bug":"...","why_missed":"..."}],
   "forbidden_phrases_count": 0,
   "friction_notes": ["..."],
   "token_cost": "medium",
-  "score": -2,
+  "score": 0,
   "proposed_edit": {
     "rationale": "why this edit helps",
-    "old_string": "EXACT verbatim slice from SKILL.md",
+    "old_string": "VERBATIM slice from SKILL.md",
     "new_string": "replacement"
   }
 }
 ```
 
-Or `"proposed_edit": null` if no warranted edit.
+Or `"proposed_edit": null`.
 
-## SKILL.md under test
-
-{skill_contents}
+Do not write files. Do not dispatch other agents.
 ```
+
+The caller supplies a "Reserved scenarios" block (iter-1 through iter-{N-1}
+scenarios) and an "Already applied edits" block (so the subagent doesn't
+re-propose prior edits).
 
 ---
 
-#### PROMPT (benchmark mode)
-
-Identical to free mode EXCEPT replace step 1 with:
+#### PROMPT (benchmark mode — pure regression test, NO edit proposal)
 
 ```
-1. Use the fixture below verbatim as the task. Do NOT invent a new task.
-   Do NOT reveal the ground truth to the simulation step.
+You are the benchmark evaluator for the code-guardian Claude Code skill.
+Iteration: {N} / 100. Mode: benchmark. Fixture index: {fixture_index}.
 
-=== FIXTURE ===
+FIRST: Read `/Applications/MAMP/htdocs/code_guard/code-guardian/SKILL.md` in full.
+
+## Your ONLY job
+
+Given the fixture below (task + hidden ground truth), simulate step-by-step what
+a Claude Code session armed with the SKILL.md would produce. Then compare the
+simulation output against the fixture's ground truth.
+
+DO NOT invent a task. DO NOT propose an edit. You are a pure regression tester.
+
+## Fixture
+
 {fixture_contents}
-=== END FIXTURE ===
+
+## Output format
+
+Write a short report covering simulation + comparison. END with EXACTLY this
+JSON in a single ```json fence, nothing after:
+
+```json
+{
+  "iter": N,
+  "mode": "benchmark",
+  "fixture": "fixture-0N.md",
+  "fixture_title": "...",
+  "bugs_planted": 5,
+  "bugs_caught": 4,
+  "bugs_missed": [{"bug":"...","why_missed":"..."}],
+  "forbidden_phrases_count": 0,
+  "fixture_min_expected": 4,
+  "passed_threshold": true,
+  "score": 4
+}
 ```
 
-And set `"mode": "benchmark"` in the JSON output.
+`passed_threshold` is `true` iff `bugs_caught >= fixture_min_expected`
+AND `forbidden_phrases_count == 0`.
+
+Do not write files. Do not dispatch other agents.
+```
 
 ---
 
 ### 7. Parse the JSON
-Extract the last fenced ```json block from the agent's output. Parse it.
-If parsing fails or required fields are missing:
+Extract the last fenced ```json block. Parse it.
+On parse failure or missing required fields:
 - Write error to `iterations/iter-{N:03d}.md`
 - Ledger action = `"error"`
-- Proceed to step 11 (commit, update state)
+- Free mode: `consecutive_noops += 1`
+- Benchmark mode: no noop increment
+- Proceed to commit (step 11).
 
 ### 8. Save full report
-Use `Write` tool to save the subagent's entire output to
+Use `Write` tool to save the subagent's output to
 `evolution/iterations/iter-{N:03d}.md`.
 
 ### 9. Apply the gate
 
-Let `score = parsed.score`, `edit = parsed.proposed_edit`, `baseline = baseline_score`.
+#### Free mode
 
-**Free mode:**
-- Accept edit iff ALL:
-  1. `edit != null`
-  2. Grep `edit.old_string` in SKILL.md → exactly 1 occurrence
-  3. `baseline == null` OR `score >= baseline`
-- If accepted → use `Edit` tool on `code-guardian/SKILL.md` (old_string/new_string).
-  After edit, Grep for `name: code-guardian` frontmatter and `## PLAN MODE (v5` to
-  verify structural integrity. If either is missing, revert the edit from memory,
-  set action = `"noop_edit_broke_structure"`, increment consecutive_noops.
-- If accepted and structure OK: `action = "edit"`,
-  `new_baseline = max(baseline or -999, score)`, `consecutive_noops = 0`.
-- Else: `action = "noop"`, `consecutive_noops += 1`.
+Let `edit = parsed.proposed_edit`, `score = parsed.score`.
 
-**Benchmark mode:**
-- If `baseline != null` AND `score < baseline`:
-  - REVERT: `git -C <workspace> show {last_good_commit}:code-guardian/SKILL.md > code-guardian/SKILL.md`
-    (use Bash tool). If `last_good_commit == null`, skip revert, log warning.
-  - `action = "revert"`, `consecutive_noops += 1`, baseline unchanged.
-- Elif edit accepted (same conditions as free mode):
-  - Apply, `action = "edit"`, update baseline, `consecutive_noops = 0`.
-- Else:
-  - `action = "noop"`, `consecutive_noops += 1`.
+Accept edit iff ALL:
+1. `edit != null`
+2. `edit.old_string` appears EXACTLY ONCE in current SKILL.md (Grep count)
+3. (After Edit tool) structure check: `grep 'name: code-guardian'` AND
+   `grep '## PLAN MODE (v5'` both return 1 line
+
+If accepted:
+- Use `Edit` tool on `code-guardian/SKILL.md` with the proposed strings
+- Run structure check; if it fails, manually revert (Edit with strings swapped)
+  and treat as noop
+- `action = "edit"`
+- `new_baseline_score = max(baseline or -999, score)` (informational only)
+- `consecutive_noops = 0`
+
+If rejected (edit null, old_string missing or non-unique, structure broken):
+- `action = "noop"`
+- `consecutive_noops += 1`
+- baseline unchanged
+
+#### Benchmark mode
+
+Let `passed = parsed.passed_threshold`, `score = parsed.score`.
+
+- If `passed == true`:
+  - No change to SKILL.md
+  - `action = "benchmark_pass"`
+  - `consecutive_noops` unchanged (benchmark doesn't count)
+- If `passed == false`:
+  - **REGRESSION** — revert SKILL.md to `last_good_commit`:
+    `git -C <workspace> show {last_good_commit}:code-guardian/SKILL.md > code-guardian/SKILL.md`
+  - `action = "revert"`
+  - `consecutive_noops` unchanged
+  - baseline unchanged
+  - If `last_good_commit == null`, log a warning and skip the revert
 
 ### 10. Ledger entry
 Append ONE JSON line to `evolution/ledger.jsonl`:
 
 ```json
-{"iter":N,"ts":"ISO8601","mode":"free|benchmark","task":"title","score":S,"baseline":B,"action":"edit|noop|revert|error","report":"iterations/iter-NNN.md"}
+{"iter":N,"ts":"ISO","mode":"free|benchmark","task":"title","score":S,"baseline":B,"action":"edit|noop|revert|benchmark_pass|error","report":"iterations/iter-NNN.md","agent_model":"opus"}
 ```
 
 ### 11. Update state.json
-Write:
-```json
-{
-  "iter": N,
-  "max_iter": 100,
-  "baseline_score": new_baseline,
-  "last_good_commit": (updated_after_commit_if_edit_else_unchanged),
-  "consecutive_noops": new_noops,
-  "stop_reason": null_or_set,
-  "cron_job_id": unchanged,
-  "started_at": unchanged,
-  "subagent_model": "opus",
-  "gate_mode": "on"
-}
-```
-
-Note: `last_good_commit` will be updated AFTER step 12 (chicken-and-egg). Save
-state.json with a placeholder, then after the commit in step 12, do a SECOND
-commit that updates `last_good_commit` to `git rev-parse HEAD~0`. Two commits per
-iteration is acceptable — keeps the history auditable.
+Write new state with updated `iter`, `baseline_score`, `consecutive_noops`,
+`last_good_commit` (PENDING placeholder for edit/revert actions — to be filled
+in the second commit). Keep `cron_job_id`, `max_iter`, `started_at` unchanged.
 
 ### 12. Commit
 ```
@@ -243,44 +289,35 @@ git -C /Applications/MAMP/htdocs/code_guard add -A
 git -C /Applications/MAMP/htdocs/code_guard commit -m "iter N: {action} score={score} | {task_title}"
 ```
 
-If `action == "edit"` or `"revert"`: run `git rev-parse HEAD`, write that SHA into
-`state.json.last_good_commit`, then second commit:
-```
-git -C ... add evolution/state.json
-git -C ... commit -m "iter N: state sha update"
-```
+If `action == "edit"` or `"revert"`:
+1. Run `git rev-parse HEAD` → SHA
+2. Replace the `"PENDING"` placeholder in `state.json` with the actual SHA
+3. `git add evolution/state.json && git commit -m "iter N: state sha update"`
 
 ### 13. Summary line
-Print to stdout / final message:
+Print:
 ```
-iter N/100 | {mode} | {action} | score={score} baseline={baseline} | noops={noops}
+iter N/100 | {mode} | {action} | score={score} baseline={baseline} | noops={consecutive_noops}
 ```
 
 ---
 
 ## Error handling
-
-If ANY step raises an exception:
-1. Catch, write short description to `evolution/iterations/iter-{N:03d}.md`
-2. Append ledger entry with `"action":"error"`, `"error":"<msg>"`
-3. Commit what exists
-4. Do NOT CronDelete — let the next cron tick retry
-5. Exit cleanly
+- Catch any exception
+- Write short error to `iterations/iter-{N:03d}.md`
+- Append ledger entry with `"action":"error"`
+- Commit what exists
+- Do NOT CronDelete — next tick retries
+- Exit cleanly
 
 ## Loop termination
-
 - Natural: `iter >= 100` or `consecutive_noops >= 10`
-- At termination: try `CronDelete(cron_job_id)`. If the CronDelete tool schema is
-  not loaded, call `ToolSearch("select:CronDelete", 1)` first, then call it.
-- If CronDelete fails (wrong ID, already gone): just commit the state and exit.
-  Cron auto-expires after 7 days regardless.
-- Stop-flag fallback: once `stop_reason` is set, all future ticks will immediately
-  exit at step 2.
+- At termination: try `CronDelete(cron_job_id)` via `ToolSearch("select:CronDelete", 1)`
+  then call. If it fails, commit the state and exit — cron auto-expires after 7 days.
 
-## Things this loop does NOT do
-
-- Does NOT run any real code (the subagent simulates, does not execute)
+## What this loop does NOT do
+- Does NOT run any real code (simulation only)
 - Does NOT touch `~/.claude/skills/code-guardian/` (manual `./deploy.sh`)
-- Does NOT call any external APIs beyond the Anthropic subagent dispatch
-- Does NOT alter files outside `/Applications/MAMP/htdocs/code_guard`
-- Does NOT amend commits (global rule: always new commits)
+- Does NOT touch files outside the workspace
+- Does NOT amend commits (always new commits)
+- Does NOT use Sonnet or Haiku — Opus 4.6 only
