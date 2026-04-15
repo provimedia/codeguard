@@ -458,6 +458,7 @@ When one layer produces data and another layer consumes it, verify both sides ag
 - Key rename mid-pipeline: producer emits `status`, consumer reads `success` → null
 - Computed/derived property not opted into the serializer (accessor, virtual attribute, getter, lazy field) → absent from payload, consumer reads undefined
 - Hardcoded path under a subdirectory / reverse-proxy install bypasses the base-URL helper → resolves to wrong base, 404 only in the non-root deployment
+- 64-bit integer ID (BIGINT / int64) emitted as a JSON number > 2^53 → any float64-backed parser (JS, most JSON libs) rounds to nearest double and adjacent IDs collide silently → serialize large integers as strings at the response boundary
 
 **How to check (READING is not enough):**
 1. Trace the data from where it's CREATED to where it's READ.
