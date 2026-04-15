@@ -100,12 +100,7 @@ auth instead.
 
 ### P4. Cached-Config Safety
 
-Runtimes that pre-compile config at boot snapshot env vars ONCE. Reading
-env vars directly from application code (outside the config layer) returns
-null after boot-time caching. Every plan that introduces a new env var
-MUST route access through the project's config layer, not a raw env read
-at the call site. Verification: grep the plan's pseudocode for direct env
-reads outside config files; any match → reject.
+Runtimes that pre-compile config at boot snapshot env vars ONCE; raw env reads outside the config layer return null post-cache. Every new env var MUST go through the project's config layer — grep the plan's pseudocode for direct env reads outside config files; any match → reject.
 
 ### P5. Pattern Source Quality Check
 
