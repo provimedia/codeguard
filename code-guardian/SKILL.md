@@ -664,40 +664,29 @@ Watch for these patterns in any ORM OR external-call loop:
 - External HTTP/RPC call inside a row loop — require a bulk endpoint, `Http::pool()`, or justify per-row cost against the row count
 
 ### Cache Invalidation Coverage
-Every `Cache::remember($key, ...)` is a promise that EVERY mutation to the underlying data calls `Cache::forget($key)` (or `Cache::tags([...])->flush()`). A cache without invalidation is a bug with a timer.
+Every cached read is a promise that EVERY mutation to the backing data also invalidates the cache entry. A cache without invalidation is a bug with a timer.
 
-**The check (VERIFIED, not asserted):** for every cache key introduced or touched by this change, grep EVERY write path to the backing table — controller update/store/destroy, scheduled jobs, queue jobs, inline decrement/increment, raw SQL, tinker scripts — and prove each one invalidates the key.
+**The check (VERIFIED, not asserted):** for every cache key this change introduces or reads, grep EVERY write path to the backing table — request handlers, scheduled tasks, background workers, inline increments, raw SQL, ad-hoc scripts — and prove each one invalidates (or tag-flushes) the same key. Audit reflex: name 0 unguarded mutation paths out loud before the check passes.
 
-```bash
-# 1. Find the cache key
-grep -rn "Cache::remember\|Cache::tags" app/ --include='*.php'
-# 2. Find the model/table behind it (e.g. PromoCode)
-# 3. Find EVERY mutation path for that model
-grep -rn "PromoCode::\|->promoCodes\|promo_codes" app/ --include='*.php' \
-  | grep -E "update\(|save\(|delete\(|create\(|insert\(|increment\(|decrement\(|destroy\("
-# 4. For each hit, confirm Cache::forget('<same-key>') OR Cache::tags([...])->flush() is adjacent
-# Result: 0 unguarded mutation paths before claiming the audit passes.
-```
-
-Also check the inverse direction: a scheduled job or queue worker that mutates the DB on a different process than the request cycle must STILL invalidate — shared Redis/Memcached is global, but stale reads don't self-heal.
+Also check the inverse direction: a background process that mutates the DB outside the request cycle must STILL invalidate. Shared cache is global; stale reads do not self-heal.
 
 ### Concurrency / TOCTOU on Counters and Quotas
-Any `check-then-act` pattern on a counter (`uses_left`, `stock`, `seats_remaining`, `credits`) is a race unless the check and the mutation happen in ONE atomic SQL statement OR inside `DB::transaction(fn() => Model::lockForUpdate()...)`. Reading from a cache and then decrementing is ALWAYS wrong — the cache value is already stale relative to concurrent requests.
+Any `check-then-act` pattern on a counter (`uses_left`, `stock`, `seats_remaining`, `credits`) is a race unless the check and the mutation happen in ONE atomic step — a conditional `UPDATE` with affected-row check, a row-level lock inside a transaction (`SELECT ... FOR UPDATE`), or an equivalent CAS primitive. Reading from a cache and then decrementing is ALWAYS wrong: the cache value is already stale relative to concurrent writers.
 
-```php
-// WRONG — two concurrent requests both read uses_left=1, both decrement, both succeed
-$promo = Cache::remember(...);
-if ($promo->uses_left > 0) { $promo->decrement('uses_left'); }
+```sql
+-- WRONG: read-then-write leaks a race window
+SELECT uses_left FROM promo WHERE id = ?;        -- both concurrent requests see 1
+UPDATE promo SET uses_left = 0 WHERE id = ?;      -- both reach here, quota oversubscribed
 
-// RIGHT — atomic conditional update, check affected rows
-$ok = PromoCode::where('id', $id)
-    ->where('uses_left', '>', 0)
-    ->decrement('uses_left');
-if ($ok === 0) { /* race lost, reject */ }
+-- RIGHT: atomic conditional decrement, check affected rows
+UPDATE promo SET uses_left = uses_left - 1 WHERE id = ? AND uses_left > 0;
+-- PHP then checks PDOStatement::rowCount(); 0 = race lost, reject.
 ```
 
-### Queue Job Idempotency (at-least-once by contract)
-Laravel queues are at-least-once: a worker crash between side-effect and ack causes the SAME job payload to run again. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (unique index on `(aggregate_id, operation_id)`) OR must be provably pure. `Mail::to(...)->send(...)` inside `handle()` with no guard = duplicate email on every retry. Audit reflex: for every `implements ShouldQueue`, name the idempotency key or justify why the job is pure.
+Audit reflex: for every counter mutation in the diff, name the atomicity mechanism out loud or reject the change.
+
+### Queue/Task Idempotency (at-least-once by contract)
+Virtually every queue/task runner is at-least-once by contract: a worker crash between side-effect and ack re-runs the SAME payload. Every job that sends mail, charges money, increments a counter, writes a file, or calls an external API needs a dedup key checked-and-set in one transaction (e.g. a `UNIQUE` index on `(aggregate_id, operation_id)`) OR must be provably pure. Unguarded side-effects inside a retry-eligible handler = duplicate side-effect on every retry. Audit reflex: for every enqueued job type in the diff, name the idempotency key or justify purity.
 
 ---
 
