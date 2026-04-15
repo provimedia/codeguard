@@ -283,8 +283,6 @@ After writing code, re-run the consumer grep from Step 1d. For each consumer:
 
 ### Step 3: Audit (AFTER writing code) — ALWAYS. NO EXCEPTIONS.
 
-The audit runs every single time code is written or changed. It is never skipped, never deferred, never "done later". The triage determines WHICH layers run at full depth — but every layer runs at minimum as a spot-check.
-
 > **VERIFICATION-NOT-ASSERTION RULE (v4 — born from real bugs that slipped through)**
 >
 > Audit checks must be **VERIFIED** by command output, not **ASSERTED** by reading code.
