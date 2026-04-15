@@ -324,31 +324,12 @@ The audit runs every single time code is written or changed. It is never skipped
 > Three reflexes that the v4 audit drills into:
 >
 > **A) JSON Inspection over Code Reading**
-> When auditing Cross-Layer Data Contracts, do not stop at "controller returns key X, Vue reads key X".
-> Eloquent accessors, hidden attributes, $appends omissions, and conditional `when()` props mean
-> the structural match can pass while the actual JSON has `key: undefined`. Always verify the
-> actual payload:
->
-> ```bash
-> # Inertia render JSON — adapt the URL to your project
-> curl -s "${APP_URL}/<route>" \
->   | grep -oE 'data-page="[^"]+"' \
->   | python3 -c 'import sys, html, json; raw=html.unescape(sys.stdin.read()[11:-1]); print(json.dumps(json.loads(raw), indent=2)[:2000])'
->
-> # Or use Playwright to assert non-undefined hrefs:
-> page.locator('a[href*="undefined"]').count()  // must be 0
->
-> # Or via tinker — for Eloquent paginators:
-> php artisan tinker --execute="echo json_encode(\App\Models\X::paginate(3)->toArray()['data'][0], JSON_PRETTY_PRINT);"
-> ```
->
-> If the value the Vue side reads is `undefined`/`null` in the actual JSON when the bug-causing
-> code path is exercised → that's the bug. Not what you read in the controller's PHP.
->
-> **Real bug this prevents:** `getLocalPathAttribute()` was a model accessor not in
-> `$appends`. Controller code looked correct. Vue defineProps looked correct. But
-> `paginate()->toArray()` never invoked the accessor → 1,142 article links rendered as
-> `/undefined`.
+> Cross-Layer audits do not stop at "producer returns key X, consumer reads key X". Computed
+> fields, hidden attributes, omitted serializer opt-ins, and conditional props mean the
+> structural match can pass while the actual payload has `key: undefined`. Always dump the
+> real serialized response the consumer will receive (HTTP fetch, REPL, or a browser
+> assertion that no rendered link contains `undefined`) and confirm every consumed key is
+> non-null on the bug-triggering code path.
 >
 > **B) Hunt-and-Replace Verification**
 > When fixing a known pattern (e.g. wrap a hardcoded `/path/` in a helper), DO NOT stop at the
