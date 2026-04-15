@@ -207,26 +207,18 @@ Note: Columns with multiple indexes or FKs appear as duplicate rows — expected
 
 For EVERY function, method, class, or variable you are about to change:
 
-```
-Step 1: Find all consumers
-```
-Grep for the function/method name across the entire codebase. Not just the file you're working in — EVERY file.
+**Step 1 — Find all consumers.** Grep the name across the entire codebase, not just the file you're working in.
 ```bash
 grep -r "functionName\|ClassName\|methodName" --include="*.php" --include="*.js" --include="*.ts" --include="*.vue" --include="*.blade.php" -l
 ```
 
-```
-Step 2: Read each consumer — understand HOW it uses the function
-```
-For each file found, read the actual call site. Document:
+**Step 2 — Read each consumer.** For each file found, read the actual call site. Document:
 - What **parameters** does this caller pass?
 - What **return value** does it expect (type, structure, null possibility)?
 - Does it depend on **side effects** (session, global state, DB writes)?
 - What **page/view/form** does this caller belong to?
 
-```
-Step 3: Build the impact map (silent, no output yet)
-```
+**Step 3 — Build the impact map** (silent, no output yet):
 ```
 FUNCTION: saveUser()
 ├── used in: RegisterController.php → passes (name, email, password) → expects User object back
@@ -235,10 +227,7 @@ FUNCTION: saveUser()
 └── used in: ApiUserController.php → passes (name, email, password, team_id) → expects JSON
 ```
 
-```
-Step 4: Identify what breaks
-```
-Before writing a single line: check your planned change against EVERY consumer.
+**Step 4 — Identify what breaks.** Check your planned change against EVERY consumer BEFORE writing a line:
 - Changing parameters? → Which callers pass different arguments?
 - Changing return type/structure? → Which callers expect the old format?
 - Removing a side effect? → Which callers depend on it?
