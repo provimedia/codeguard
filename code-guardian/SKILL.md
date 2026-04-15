@@ -91,7 +91,7 @@ do. Verify with `EXPLAIN`: index is used AND the row estimate is bounded.
 ### P3. Secrets Hygiene for API Calls
 
 Every plan that introduces an API call OR an inbound webhook endpoint MUST pass the key / shared secret / signature via **header**, never query string — in BOTH directions. Leakage surface for `?key=` / `?api_key=` / `?token=`: HTTP-client exceptions log the full URL; web-server and reverse-proxy access logs record the query string; browser history and Referer headers forward it on any redirect.
-- Inbound webhooks: signature in a header, compared with a constant-time equality function (PHP: `hash_equals`, never `==`/`===`/`strcmp`/`strncmp` — non-constant-time compare leaks prefix bytes via response-time side channel).
+- Inbound webhooks: signature in a header, compared with a constant-time equality function (PHP: `hash_equals`, never `==`/`===`/`strcmp`/`strncmp` — non-constant-time compare leaks prefix bytes via response-time side channel; same rule for ANY secret/hash/PIN/token equality — `==` type-juggles two strings matching `^0+e\d+$` to the float `0.0 == 0.0`, so bcrypt hashes, md5 hashes, PINs and API keys MUST use `hash_equals` (or `password_verify` for bcrypt), never `==`/`===`).
 - User-facing download/reset/magic-login links: signed, time-limited URL bound to route+expiry and verified server-side; store a SHA-256 HASH of the token in the DB (never the raw value); enforce one-time use via a `consumed_at` column checked+set in a single transaction.
 
 **Verification during plan review:** grep the plan's pseudocode for `?key=`,
