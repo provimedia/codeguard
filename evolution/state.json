@@ -1,5 +1,5 @@
 {
-  "iter": 29,
+  "iter": 30,
   "max_iter": 100,
   "baseline_score": 68,
   "last_good_commit": "2fef3ec3810eb692ba11dfea56a72d221021a86f",
@@ -12,10 +12,10 @@
   "direction": "generality_php_mysql_substrate",
   "skill_md_lines": 800,
   "last_benchmark": {
-    "iter": 20,
-    "fixture": "fixture-02.md",
+    "iter": 30,
+    "fixture": "fixture-03.md",
     "passed": true,
-    "caught": 4,
-    "expected": 3
+    "caught": 3,
+    "expected": 2
   }
 }
