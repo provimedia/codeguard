@@ -518,27 +518,12 @@ git log --oneline -5 && git diff --name-only HEAD~3
 
 **1d. Cross-Page Dependency Trace** — The bug might not be WHERE the error shows. A change in Page A can break Page B.
 
-```
-Step 1: Identify the broken function/method
-Step 2: Grep for it across the ENTIRE codebase
-```
-```bash
-grep -r "brokenFunction\|BrokenClass" --include="*.php" --include="*.js" --include="*.ts" --include="*.vue" --include="*.blade.php" -rn
-```
-```
-Step 3: For each consumer found, answer:
-  - Which page/view/form/route does this belong to?
-  - Was THIS consumer recently changed?
-  - Does this consumer still call the function with correct params?
-  - Does this consumer handle the return value correctly?
-```
-```
-Step 4: Check git — was the function itself recently changed?
-```
-```bash
-git log --oneline -10 -- path/to/file/with/function
-```
-If yes: the bug is likely a DEPENDENCY BREAK — someone changed the function and didn't update all consumers.
+Run the consumer-grep + impact-map workflow from **BUILD Step 1d** (Dependency Impact Analysis). Same grep, same "read every call site" discipline. Then add two DEBUG-specific questions per consumer:
+
+- Was **this consumer** recently changed? (`git log --oneline -10 -- <consumer>`)
+- Was the **function itself** recently changed? (`git log --oneline -10 -- <file-with-function>`)
+
+If the function was recently changed and a consumer was not: the bug is likely a DEPENDENCY BREAK — someone changed the function and didn't update all consumers. This is the single most common root cause when "Page B broke after I worked on Page A".
 
 **STOP. No fix proposal until Phase 2 is complete.**
 
