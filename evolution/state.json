@@ -5,7 +5,7 @@
   "last_good_commit": null,
   "consecutive_noops": 0,
   "stop_reason": null,
-  "cron_job_id": null,
+  "cron_job_id": "d5dac41e",
   "started_at": "2026-04-15T19:45:00+02:00",
   "subagent_model": "opus",
   "gate_mode": "on"
