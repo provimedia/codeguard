@@ -1,21 +1,29 @@
-# Code Guardian Evolution Loop — Iteration Runner (v2)
+# Code Guardian Evolution Loop — Iteration Runner (v3)
 
 This file is executed by a Claude Code session fired by cron every 3 minutes.
 Each run = one iteration of the skill's self-improvement loop.
 
-## What changed in v2
-- **Score-based gate removed.** The old rule `score >= baseline` blocked legitimate
-  edits on harder tasks (iters 4–5 missed TOCTOU / cache / queue gaps but couldn't
-  land fixes because their raw score was below baseline). Score is now **logged,
-  not gated**.
-- **Structural gate only** for free mode: edit must exist, old_string must be
-  unique, post-edit structure must still parse (frontmatter + PLAN MODE marker).
-- **Benchmark mode = pure regression test** every 10th iter: simulate the current
-  skill against a pinned fixture, compare bugs caught to the fixture's minimum
-  threshold, revert to `last_good_commit` on regression. No edits applied in
-  benchmark iters.
-- **Consecutive noops** only increment on **free-mode** noops (subagent returned
-  null, or edit was structurally rejected). Benchmark iters don't count.
+## What changed in v3 (generality + optimization mandate)
+- **Generality Principle (user directive, mid-loop)**: the skill must work for
+  ANY project and ANY stack. No framework-locked examples. Proposed edits that
+  bake in framework-specific APIs (`Cache::remember`, `ShouldQueue`, `storeAs`,
+  `public_path`, `Str::uuid`, `Http::pool`, `Mail::to`, `Eloquent`, `Inertia`,
+  `Blade`, `Vue`, `Laravel`, `Django`, `Rails`, `Express`, ...) must either (a)
+  be rewritten in framework-agnostic wording with at most ONE brief example, or
+  (b) be rejected as noop.
+- **Optimization bias**: prefer TIGHTENING / REMOVING / DEDUPLICATING over
+  ADDING. The skill should get shorter or stay flat across iterations — NOT
+  longer. New content must carry its weight (>= 1 real bug class not covered
+  anywhere else, AND framework-agnostic).
+- **Line-count watch**: SKILL.md line count is logged in every ledger entry. A
+  3-iter trend of line-count growth without proportional coverage gain is a
+  signal to generalize/deduplicate.
+
+## What changed in v2 (kept)
+- Score-based gate removed. Score is diagnostic, not gated.
+- Structural gate only for free mode.
+- Benchmark mode = pure regression test every 10th iter.
+- Consecutive noops only increment on free-mode noops.
 
 ---
 
@@ -32,6 +40,24 @@ Touch only `/Applications/MAMP/htdocs/code_guard`. Do NOT deploy to
 ### Drift protection
 The only real drift guard is the benchmark fixture run every 10 iterations. Do
 NOT over-protect with per-iter score comparisons — that blocks real improvements.
+
+### Generality gate (v3)
+Before applying any edit, scan `new_string` for framework-locked tokens:
+`Laravel`, `Eloquent`, `Blade`, `Inertia`, `Vue`, `Cache::`, `Http::pool`,
+`storeAs`, `storage_path`, `public_path`, `$request->`, `->file(`, `Str::`,
+`ShouldQueue`, `Mail::to`, `config('`, `env('`, `Artisan::`, `Schema::`,
+`Eloquent`, `php artisan`, `DB::`, `Route::`, `->make(`, `->pluck(`.
+Count the hits. Judgment call:
+- **>= 3 framework tokens** AND the edit is > 10 lines of new content → **reject
+  as noop**. Too framework-specific.
+- **1–2 framework tokens** AND they're brief examples illustrating a general
+  principle → **allow**, but only if the principle itself is stated in
+  framework-agnostic terms FIRST.
+- **0 framework tokens** AND the edit tightens/removes/generalizes existing
+  content → **preferred**, allow.
+
+Pure deletion edits (shortening SKILL.md) always pass the generality gate —
+removing is always generalizing.
 
 ---
 
@@ -116,18 +142,27 @@ FIRST: Read `/Applications/MAMP/htdocs/code_guard/code-guardian/SKILL.md` in ful
 
 5. PROPOSE ONE MINIMAL EDIT that addresses the #1 failure mode OR friction
    observed in this iteration. The edit MUST be:
-   - Concrete: exact `old_string` (verbatim slice from the actual SKILL.md you
-     read — copy-paste precise) and `new_string`
-   - Minimal: smallest diff that addresses the issue
-   - Token-aware: prefer tightening / replacing / deduplicating existing text
-     over appending new warnings
-   - Net-improving: do NOT add a warning that duplicates existing guidance
-   - `old_string` must appear EXACTLY ONCE in SKILL.md
-   - If the skill already handles this case well AND you see no real friction
-     to reduce → return `"proposed_edit": null`. This is valid and often correct.
-     But do NOT return null just because your simulation missed some bugs — if
-     there is a real gap, propose the fix. The main loop will decide whether to
-     apply it based on structural checks, not on your score.
+   - **Framework-agnostic**: state the principle in universal terms. Laravel,
+     Vue, Rails, Django, Express, Spring, Go — whatever. The skill is used
+     across stacks. NO framework class/method/function names in the `new_string`
+     unless (a) the principle itself is stated generically first AND (b) the
+     example is ONE brief line. Preferred: zero framework tokens. Hard cap:
+     >=3 framework tokens OR >10 lines with 1+ framework tokens → main loop
+     will reject as a generality violation.
+   - **Tightening preferred over adding**: the best edits REMOVE duplication,
+     REPLACE verbose content with tighter wording, or DELETE dead weight. Next
+     best: one bullet added to an existing section. Worst: new section with
+     examples. If your proposed edit is adding lines, you must justify why no
+     existing content could be refactored instead.
+   - **Concrete**: exact `old_string` (verbatim slice — copy-paste precise) and
+     `new_string`. `old_string` must appear EXACTLY ONCE in SKILL.md.
+   - **Minimal**: smallest diff that addresses the issue.
+   - **Net-improving**: no duplication of existing guidance.
+   - If the skill already handles this case well AND you see no friction to
+     reduce → return `"proposed_edit": null`. Valid and often correct.
+   - Do NOT return null just because your simulation missed bugs. If there's a
+     real general gap, propose a general fix. But if the gap is only expressible
+     as framework-specific code, prefer `null` over a framework-locked edit.
 
 ## Output format
 
@@ -239,7 +274,18 @@ Let `edit = parsed.proposed_edit`, `score = parsed.score`.
 Accept edit iff ALL:
 1. `edit != null`
 2. `edit.old_string` appears EXACTLY ONCE in current SKILL.md (Grep count)
-3. (After Edit tool) structure check: `grep 'name: code-guardian'` AND
+3. **Generality gate**: count framework-locked tokens (`Laravel`, `Eloquent`,
+   `Blade`, `Inertia`, `Vue`, `Cache::`, `Http::pool`, `storeAs`, `storage_path`,
+   `public_path`, `$request->`, `Str::`, `ShouldQueue`, `Mail::to`, `config('`,
+   `env('`, `php artisan`, `Route::`, `DB::`) in `edit.new_string`. If the
+   count is >= 3 AND the new content is > 10 lines → reject as noop with
+   rationale "generality violation". If the count is 1–2 but they are ONE
+   brief example under a generically-stated principle, allow. Pure removal
+   edits always pass.
+4. **Line-count guard**: if the edit makes SKILL.md grow AND the trend over
+   the last 3 iterations is already growing, require the subagent's rationale
+   to explicitly name what cannot be refactored/removed instead. Judgment call.
+5. (After Edit tool) structure check: `grep 'name: code-guardian'` AND
    `grep '## PLAN MODE (v5'` both return 1 line
 
 If accepted:
@@ -272,11 +318,15 @@ Let `passed = parsed.passed_threshold`, `score = parsed.score`.
   - If `last_good_commit == null`, log a warning and skip the revert
 
 ### 10. Ledger entry
-Append ONE JSON line to `evolution/ledger.jsonl`:
+Append ONE JSON line to `evolution/ledger.jsonl`. Include `skill_md_lines` (run
+`wc -l code-guardian/SKILL.md` before the commit) so the trend is visible:
 
 ```json
-{"iter":N,"ts":"ISO","mode":"free|benchmark","task":"title","score":S,"baseline":B,"action":"edit|noop|revert|benchmark_pass|error","report":"iterations/iter-NNN.md","agent_model":"opus"}
+{"iter":N,"ts":"ISO","mode":"free|benchmark","task":"title","score":S,"baseline":B,"action":"edit|noop|revert|benchmark_pass|error","report":"iterations/iter-NNN.md","agent_model":"opus","skill_md_lines":NNN,"skill_md_delta":±N}
 ```
+
+A negative `skill_md_delta` (skill got shorter) is a GOOD signal under v3.
+A positive delta requires justification in the iteration report.
 
 ### 11. Update state.json
 Write new state with updated `iter`, `baseline_score`, `consecutive_noops`,
