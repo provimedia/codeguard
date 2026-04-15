@@ -83,12 +83,10 @@ grep -n "Inertia::render\|->only(\|->toArray()" app/Http/Controllers/*.php | hea
 #   the plan MUST include a controller change. $fillable alone is not enough.
 ```
 
-**Real bug from this session:** Plan said "ShopController needs no change because
-description_helpful is in $fillable". `ShopController@show` actually built an
-explicit `['id' => ..., 'name' => ..., ...]` array. Without the controller fix,
-Vue would receive `product.description_helpful === undefined` and the v-if would
-never fire → dead feature in production. Caught by implementer's pre-commit
-audit, not by the plan.
+**Lesson:** A model-layer allowlist (e.g. mass-assignment fillable) does NOT
+guarantee client delivery — if the controller serializes via an explicit key
+whitelist, any field absent from that whitelist is dropped silently and the
+client-side conditional never fires. Always grep the controller, not the model.
 
 ### P2. Scale Verification for DB Iteration
 
