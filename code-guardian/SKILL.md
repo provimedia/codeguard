@@ -520,11 +520,7 @@ Common traps:
 - Normal flow returns rendered page, self-redirect returns different response type
 
 ### Interface Boundary Verification
-When new code calls existing services/functions:
-1. Read the ACTUAL function signature, not what you assume it is
-2. Verify parameter count, types, and order match
-3. Verify the return type is what you expect
-4. Verify optional parameters have correct defaults
+When new code calls existing services/functions, read the ACTUAL signature — verify parameter count, types, order, return type, and optional defaults all match what you assume.
 
 ### ORM/Model Verification
 When code references DB fields, verify against BOTH the Model AND the live DB:
