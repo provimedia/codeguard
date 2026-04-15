@@ -438,6 +438,7 @@ If any consumer is not verified → NOT ready. Go back and check.
 2. Test that reproduces the bug (now green)
 3. Existing tests still green
 4. Confirm: original bug gone, edge cases handled, dependencies intact
+5. Run the BUILD MODE Audit (3a-3g) on the fix diff — a fix is a code change and gets the same 7-point audit as any other change, no exceptions
 
 ### Escalation
 
