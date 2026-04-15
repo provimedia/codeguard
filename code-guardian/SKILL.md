@@ -624,6 +624,22 @@ Distinct from P3 Secrets Hygiene (secrets in URLs / webhook paths) and from Secu
 
 Also: append-only log writes without an exclusive lock interleave under concurrency and corrupt downstream parsers — use a logger library that locks per write.
 
+### HTTP Header-Value Injection (CRLF + quoted-string breakout)
+Any user-controlled string flowing into a response header value is a header-injection sink — even when the runtime claims to reject CRLF. Three ways past the default defence:
+
+1. **Quoted-string breakout**: `Content-Disposition`, `Link`, `WWW-Authenticate` use quoted sub-parameters (`filename="..."`, `rel="..."`). A raw `"` closes the string and lets the attacker inject extra params (`; filename*=UTF-8''evil.html`) — the CRLF filter does NOT filter `"`.
+2. **Bare `\r` / `\x00`**: some runtimes and FastCGI bridges block the `\r\n` pair but pass a lone `\r` or NUL byte; downstream proxies may still split on them.
+3. **Non-ASCII in ASCII-only fields**: RFC 7230 requires header values to be VCHAR+SP+HTAB. Non-ASCII in `Content-Disposition filename=` without the RFC 5987 `filename*=UTF-8''` encoded form is silently mangled by proxies → cross-browser filename inconsistency that can mask extension-sniffing attacks.
+
+Distinct from XSS (HTML body escaping) and P3 (secrets in URLs): this covers data flowing into `header()` / `setcookie()` / `Location:` / template header pushes.
+
+**Audit reflex** — for every `header(` / `setcookie(` / equivalent in the diff, trace the value to its source and answer:
+1. **Is any part user-controlled?** DB columns count if ANY user endpoint ever writes them (grep the write path).
+2. **Strictly filtered to the header's grammar?** For `filename=`: ASCII printable minus `"` and `\`, non-ASCII via `filename*=UTF-8''` percent-encoding. For `Location:`: a URL allowlist, not just a CRLF strip. For `Set-Cookie` value: token grammar only.
+3. **Validation at WRITE time or READ time?** Write-time reject (at rename/upload) is correct; read-time filtering is defence-in-depth. "We wrote it ourselves" is wrong if ANY path lets a user shape the column.
+
+Verify: `curl -D -` on the endpoint after injecting a quote-breakout payload at write time; response MUST contain exactly one `Content-Disposition` parameter with no raw `"`, `\r`, `\n`, `\x00`, or non-ASCII outside `filename*=`.
+
 ### Frontend Reactivity Traps
 These cause bugs that no linter catches:
 - **Destructured reactive state**: Extracting values from reactive objects into plain variables loses reactivity. Always use computed/derived state.
