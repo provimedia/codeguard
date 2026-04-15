@@ -816,6 +816,22 @@ Audit reflex — for every `date()`, `strtotime()`, `DateTime`, `DATE(col)`, `CU
 
 Silent failure mode: for a same-TZ developer the code works every day in local testing, and breaks only for users in other zones near midnight — invisible until a support ticket from a far-away customer.
 
+### Open Redirect via Untrusted Return-To URL (`?next=`, `?redirect=`, `?returnTo=`)
+Any endpoint that reads a URL/path from caller input and emits `Location:` (or a meta-refresh, or `window.location = ...`) is an open-redirect primitive unless the target is validated against an allowlist BEFORE the header is sent. Attacker crafts `https://app.example.com/login?next=//evil.com/fake-login`; victim trusts the original domain, logs in, is bounced to the attacker clone, re-enters credentials. Distinct from P3 and Session Lifecycle: this covers the DESTINATION of a caller-controlled redirect.
+
+**Four traps that all pass a casual code read:**
+
+1. **Protocol-relative bypass** — `str_starts_with($next, '/')` treats `//evil.com/x` as relative but `Location: //evil.com/x` resolves to `https://evil.com/x`. Guard: `starts_with('/') AND NOT starts_with('//')`, OR `parse_url` + null host.
+2. **Backslash normalization** — some browsers/proxies normalize `/\evil.com` to `//evil.com`. A regex `^/[^/]` defeats `//` but not `/\`.
+3. **`parse_url` without host assertion** — checking scheme is null is not enough; `//evil.com/x` has no scheme but DOES have a host. Require `parse_url($next, PHP_URL_HOST) === null` OR `=== config('app.host')`.
+4. **Userinfo trick** — `https://app.example.com@evil.com/x` has host `evil.com` but a substring match on 'app.example.com' passes. Never allowlist by substring — parse and compare the HOST component only.
+
+**Audit reflex** — for every `Location:` / `redirect($var)` / `location.href = ...` in the diff where the target is derived from request input:
+1. **Allowlist mechanism**: a fixed enum of route names, or `parse_url` host-component equality check against the app host. Regex on raw string → BLOCKED (fails at least one trap above).
+2. **Prove the empty-host path**: demonstrate `parse_url($next, PHP_URL_HOST)` returns `null` on the accepted form AND the attacker host on each trap form.
+3. **End-to-end run**: hit the endpoint with each trap payload and follow `Location`; final hop MUST stay on the app host.
+4. **Scheme allowlist**: only null (relative) or `http`/`https` with host === app host. Reject `javascript:`, `data:`, `vbscript:`, `file:` — they may be inert in `Location:` but the same helper is often reused for `<a href>` or `<meta refresh>` where they DO execute.
+
 ### NULL Semantics in Aggregation
 Aggregate functions treat NULL inconsistently — the wrong choice silently produces the wrong number with no error. Distinct from the P2 aggregate trap (SCAN COST): this reflex is about CORRECTNESS.
 
