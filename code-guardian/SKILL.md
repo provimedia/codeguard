@@ -661,7 +661,7 @@ Watch for these patterns in any ORM OR external-call loop:
 - Accessing relationships inside a loop without prior eager loading
 - Counting related records in a loop instead of using aggregation
 - Loading full objects when only a count or existence check is needed
-- External HTTP/RPC call inside a row loop — require a bulk endpoint, `Http::pool()`, or justify per-row cost against the row count
+- External HTTP/RPC call inside a row loop — require a bulk endpoint, a parallel-request primitive (concurrent fan-out), or justify per-row cost against the row count
 
 ### Cache Invalidation Coverage
 Every cached read is a promise that EVERY mutation to the backing data also invalidates the cache entry. A cache without invalidation is a bug with a timer.
