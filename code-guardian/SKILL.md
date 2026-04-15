@@ -365,14 +365,8 @@ The audit runs every single time code is written or changed. It is never skipped
 > # Result MUST be empty before claiming the fix is done.
 > ```
 >
-> The same logic applies to: hardcoded `/storage/` paths in PHP, `<a href="/...">` in Vue,
-> `Route::get('/...')` patterns missing constraints, and any other "this kind of mistake".
+> The same logic applies to any "this kind of mistake" elsewhere in the tree.
 > Fix-propagation is the most common audit failure mode — track it explicitly.
->
-> **Real bug this prevents:** Personality test had 3 `router.post()` calls to
-> `/persoenlichkeitstest/antwort/${id}`. A previous fix wrapped 1 of them in `url()`. The
-> other 2 stayed hardcoded → entire personality test broken under MAMP subdir → blocked
-> every new user from completing onboarding.
 >
 > **C) Layout-Link → Route Existence Check**
 > Every internal link in a layout/nav/shared component must resolve to a registered route.
