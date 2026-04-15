@@ -722,6 +722,27 @@ Three acceptable remediations:
 
 Verification: for each handler in the diff, mark each step as L (local) or X (external), point at the L step that must come LAST. If the last step is X and irreversible, the audit is BLOCKED until compensation or reordering is added.
 
+### Long-Running Data Backfill Shape (undo log, resumability, replica lag)
+One-shot data migrations and backfill commands fail in three ways that no query-correctness reflex catches. Distinct from P2 (READ streaming), from deep-offset pagination (LIMIT/OFFSET shape), and from queue idempotency (retry of the same payload). This reflex is about the OPERATIONAL shape of a handler that mutates N million rows in one run.
+
+**Three failure modes:**
+
+1. **Single-statement UPDATE / undo log blow-up.** `UPDATE t SET col = expr WHERE ...` on 10M rows runs in ONE transaction whether you asked for one or not. InnoDB must keep the entire pre-image in the undo log until commit — `innodb_log_file_size` cannot absorb it and the transaction either aborts or locks the table for minutes. Fix: chunked keyset loop, 1k–5k rows per chunk, each chunk in its own short transaction. Same trap applies to `DELETE ... WHERE` and to `INSERT ... SELECT` over large source sets.
+2. **No resumability.** The command runs under `nohup`, the box reboots at row 7M, the operator restarts — and unless progress is persisted (checkpoint table OR the WHERE is naturally idempotent: `WHERE col IS NULL AND id > ?`), the restart re-processes finished rows or starts from zero.
+3. **Replica lag / write-rate unbounded.** A tight loop of chunk UPDATEs generates binlog faster than an async replica can apply it. No sleep between chunks, no watch on `Seconds_Behind_Master`, and the replica falls behind SLA invisibly — the primary looks fine, the command finishes on time, and read-replica-backed endpoints serve stale data for hours.
+
+**Audit reflex** — for every long-running mutation command / migration / backfill in the diff, answer out loud:
+1. **Chunk size + commit per chunk?** Name the chunk size and prove each chunk commits before the next begins. Single unbounded UPDATE → BLOCKED.
+2. **Resume key?** Name the column the WHERE advances on AND prove finished rows are excluded (self-excluding predicate like `WHERE col IS NULL`, or a checkpoint row updated transactionally with the chunk).
+3. **Throttle?** Name the sleep-between-chunks AND the replication-lag check (polling `SHOW REPLICA STATUS` or equivalent). Missing → BLOCKED unless the job explicitly documents "primary-only / no replicas / maintenance window covers any lag".
+
+**Verification** (command output, not code reading):
+```sql
+SHOW PROCESSLIST;               -- backfill MUST appear as many short UPDATEs, not one long one
+SHOW ENGINE INNODB STATUS\G    -- 'History list length' must not grow unbounded
+SHOW REPLICA STATUS\G          -- Seconds_Behind_Master stays within SLA while the job runs
+```
+
 ### Input Size & Complexity Limits (DoS budget)
 Every untrusted input has three dimensions — **bytes**, **cardinality**, and **complexity** — and ALL three need an explicit cap BEFORE the input reaches code that allocates memory or CPU proportional to it. An uncapped input is a DoS vector with a timer.
 
