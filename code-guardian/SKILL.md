@@ -54,39 +54,27 @@ when receiving a plan from another author.
 
 ### P1. Cross-Layer Trace for Every New Field
 
-For every NEW field/column/property the plan introduces, walk the data path
-end-to-end and **prove** each layer is wired up explicitly. Do not trust
-"`$fillable` will propagate it" — many controllers use explicit serialization
-whitelists.
+For every NEW field/column/property, walk the data path end-to-end and
+**prove** each layer is wired up explicitly. A model-layer allowlist does
+NOT guarantee client delivery: if the serializer uses an explicit key
+whitelist, any field absent from it is dropped silently and the client-side
+conditional never fires. **Always grep the serializer, not the model.**
 
 ```
-DB column                ← migration adds it
+DB column / migration
      ↓
-Model $fillable          ← grep model file
+Model allowlist + visibility (exposed? hidden? computed?)
      ↓
-Model $hidden / $appends ← does the field need to be exposed?
+Serializer / response builder (raw model vs explicit key whitelist?)
      ↓
-Controller serialization ← grep controller for explicit array vs $product->only(...) vs $product directly
+Transport payload (JSON / props / context)
      ↓
-Inertia/JSON payload     ← does the controller pass the model raw, or build a key whitelist?
-     ↓
-Vue prop                 ← does the template read product.field_name?
-     ↓
-v-if / interpolation     ← is rendering conditional or unconditional?
+Client template (read + conditional render)
 ```
 
-**Verification command (run during plan review, not just audit):**
-```bash
-# For each new field "X":
-grep -n "Inertia::render\|->only(\|->toArray()" app/Http/Controllers/*.php | head
-# If you see explicit ->only('a', 'b', 'c') OR explicit ['key' => ...] arrays:
-#   the plan MUST include a controller change. $fillable alone is not enough.
-```
-
-**Lesson:** A model-layer allowlist (e.g. mass-assignment fillable) does NOT
-guarantee client delivery — if the controller serializes via an explicit key
-whitelist, any field absent from that whitelist is dropped silently and the
-client-side conditional never fires. Always grep the controller, not the model.
+**Verification during plan review:** for each new field, grep the response
+builders for explicit key lists. If any exist, the plan MUST include a
+serializer change — adding the column + model allowlist is not enough.
 
 ### P2. Scale Verification for DB Iteration
 
