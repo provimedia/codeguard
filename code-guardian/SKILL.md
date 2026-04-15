@@ -748,6 +748,18 @@ Audit reflex — for every `date()`, `strtotime()`, `DateTime`, `DATE(col)`, `CU
 
 Silent failure mode: for a same-TZ developer the code works every day in local testing, and breaks only for users in other zones near midnight — invisible until a support ticket from a far-away customer.
 
+### NULL Semantics in Aggregation
+Aggregate functions treat NULL inconsistently — the wrong choice silently produces the wrong number with no error. Distinct from the P2 aggregate trap (SCAN COST): this reflex is about CORRECTNESS.
+
+**Four traps:**
+
+1. **`COUNT(col)` vs `COUNT(*)`** — `COUNT(col)` (and `COUNT(DISTINCT col)`) ignore rows where `col IS NULL`. A nullable column is NEVER the right thing to `COUNT(DISTINCT ...)` when the intent is "how many distinct entities" — count the primary key instead: `COUNT(DISTINCT u.id)`.
+2. **`SUM` / `AVG` over empty set returns NULL, not 0** — downstream arithmetic silently becomes NULL in loose-typed code and throws in strict-typed code. Wrap with `COALESCE(SUM(col), 0)` at the query boundary.
+3. **`AVG(col)` ignores NULL rows in BOTH numerator and denominator** — `AVG(rating)` over 100 rows where 60 are NULL returns the average of 40, not `sum/100`. If intent is "unrated = 0", use `SUM(COALESCE(rating, 0)) / COUNT(*)`.
+4. **`LEFT JOIN` silently degrades to `INNER JOIN`** — `LEFT JOIN p ON p.fk = u.id WHERE p.status = 'X'` is INNER in disguise: the WHERE filters out NULL rows the LEFT JOIN produced. Keep LEFT semantics by moving the predicate into the ON clause.
+
+**Audit reflex** — for every `COUNT`/`SUM`/`AVG`/`MIN`/`MAX` in the diff, check if the aggregated column is nullable (use `IS_NULLABLE` from the Pre-Flight schema introspection); if yes, say out loud whether NULL-exclusion is intended. For every LEFT JOIN, grep the WHERE for references to the right-side table — any match means the LEFT has degraded to INNER; confirm intent or move the predicate into ON.
+
 ---
 
 ## Self-Tuning
