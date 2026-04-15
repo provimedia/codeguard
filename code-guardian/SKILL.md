@@ -696,7 +696,7 @@ Implicit Coercion above covers charset mismatch as an INDEX-usability problem. T
 **Audit reflex** — for every `LIMIT ? OFFSET ?` in the diff, answer three questions out loud:
 
 1. **What narrows the scan BEFORE the OFFSET?** Name the WHERE predicate and prove an index covers it AND bounds the filtered set to a small multiple of page size. No narrowing WHERE → unbounded.
-2. **Is the filtered set itself bounded?** If unbounded (global firehose, audit log, telemetry, append-only table without retention), OFFSET is NOT acceptable — use keyset pagination: `WHERE (created_at, id) < (?, ?) ORDER BY created_at DESC, id DESC LIMIT N`. Cost stays O(N) regardless of depth.
+2. **Is the filtered set itself bounded?** If unbounded (global firehose, audit log, telemetry, append-only table without retention), OFFSET is NOT acceptable — use keyset pagination: `WHERE (created_at, id) < (?, ?) ORDER BY created_at DESC, id DESC LIMIT N`. Cost stays O(N) regardless of depth. **Tie-breaker is load-bearing, not cosmetic:** a cursor on `created_at` alone is NOT keyset — rows sharing the boundary timestamp are SKIPPED (strict `<`) or DUPLICATED (`<=`), and ms/sub-second precision makes ties routine under fan-out inserts. The `id` (or any unique monotonic column) in the tuple is what makes the ordering total; same applies to `ORDER BY score DESC` / `ORDER BY updated_at DESC` / any non-unique sort — always pair with a unique tiebreaker in BOTH the `ORDER BY` and the `WHERE` tuple.
 3. **Is the `page` parameter capped?** `?page=999999999` on a large table forces a walk of the entire index — a one-request DoS. Clamp `page` like you clamp `per_page`.
 
 **Verification** (command output, not code reading):
