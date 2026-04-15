@@ -128,15 +128,7 @@ WRONG — sweeps in unrelated WIP:
   git add -A                             # stages everything
 ```
 
-**Why this is plan-time, not audit-time:** the subagent prompt is locked in
-when the controller dispatches the agent. By the time the audit catches the
-swept-in WIP, the commit is already created. Fix the briefing template, not
-the symptom.
-
-**Lesson:** `git add <path>` sweeps in any other uncommitted WIP that already
-sits in the same file. On a branch with pre-existing WIP, stage hunks
-(`git add -p`) and verify the diff before commit — otherwise unrelated work
-ships under an inaccurate message and history needs rewriting to untangle.
+**Why plan-time, not audit-time:** the subagent prompt is locked when dispatch fires; by the time the audit catches swept-in WIP, the commit already exists. `git add <path>` sweeps ALL uncommitted hunks in the same file — on a branch with pre-existing WIP, stage per-hunk (`git add -p`) and verify the diff before commit, or unrelated work ships under a wrong message and history needs rewriting to untangle. Fix the briefing template, not the symptom.
 
 ### Plan Mode Output
 
