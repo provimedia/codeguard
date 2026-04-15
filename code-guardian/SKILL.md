@@ -90,19 +90,9 @@ do. Verify with `EXPLAIN`: index is used AND the row estimate is bounded.
 
 ### P3. Secrets Hygiene for API Calls
 
-Every plan that introduces an API call OR an inbound webhook endpoint MUST specify:
-- API key / shared secret passed via **header**, NEVER query string — in BOTH directions.
-- Why (outbound): HTTP-client exceptions typically include the full URL; a URL-embedded
-  key leaks into application error logs on any failure.
-- Why (inbound): `?api_key=` in a webhook URL leaks into web-server access logs,
-  reverse-proxy logs, browser history, and Referer headers on any redirect. Require
-  the signature in a header (not the query string) and compare with a constant-time
-  equality function.
-- Why (user-facing download/reset tokens): same leakage surface applies to `?token=` in
-  emailed download/reset/magic-login links. Use a signed, time-limited URL mechanism
-  (signature travels in the URL but is bound to route+expiry and verified server-side),
-  store a SHA-256 HASH of the token in the DB (never the raw value), and enforce
-  one-time use via a `consumed_at` column checked+set in a single transaction.
+Every plan that introduces an API call OR an inbound webhook endpoint MUST pass the key / shared secret / signature via **header**, never query string — in BOTH directions. Leakage surface for `?key=` / `?api_key=` / `?token=`: HTTP-client exceptions log the full URL; web-server and reverse-proxy access logs record the query string; browser history and Referer headers forward it on any redirect.
+- Inbound webhooks: signature in a header, compared with a constant-time equality function.
+- User-facing download/reset/magic-login links: signed, time-limited URL bound to route+expiry and verified server-side; store a SHA-256 HASH of the token in the DB (never the raw value); enforce one-time use via a `consumed_at` column checked+set in a single transaction.
 
 **Verification during plan review:** grep the plan's pseudocode for `?key=`,
 `?api_key=`, `?token=`. If found, reject the plan section and require header-based
