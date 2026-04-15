@@ -681,6 +681,22 @@ SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_SET_NAME, COLLATION_NAME
 -- Both rows MUST match on CHARACTER_SET_NAME AND COLLATION_NAME.
 ```
 
+### Client-Connection Charset Drift (READ-path data corruption, not index cost)
+Implicit Coercion above covers charset mismatch as an INDEX-usability problem. The same missing DSN parameter also CORRUPTS read-path DATA silently — and looks nothing like the index case, so the index reflex doesn't trip. Every DB driver negotiates a client-side charset for results delivery; if the DSN (`mysql:host=...;dbname=...;charset=utf8mb4`) or equivalent is missing, the server falls back to `character_set_results` from its config — on legacy/distro defaults that's often `latin1`. `utf8mb4` columns are then TRANSCODED on delivery: emoji, CJK, curly quotes, en/em dash become `?` or invalid-UTF-8 byte sequences.
+
+**Three silent failure modes riding one DSN bug:**
+1. **`json_encode` returns `false`** (JSON_ERROR_UTF8) on non-UTF-8 bytes; unchecked, `echo json_encode($rows)` emits literal `"false"` at HTTP 200 with no log.
+2. **Silent data loss on round-trip** — read transcodes to `?`, write stores `?`, original is gone with no error.
+3. **Index lookups by string value miss rows** — `WHERE name = :emoji` binds the transcoded `?` and matches zero rows; looks like "user not found", not a charset bug.
+
+**Audit reflex** — for every DB driver connect in the diff:
+1. Is the client charset named explicitly in the DSN or connect options? Absent → BLOCKED. `SET NAMES` via init-command is belt-and-braces, not a substitute (it runs after handshake).
+2. Does the named charset match the storage charset of every column the connection reads? Use the `information_schema.COLUMNS` query above — `utf8mb4` columns with a 3-byte client silently degrade supplementary-plane codepoints.
+3. Response `Content-Type` carries `charset=utf-8`? A JSON endpoint without it is sniffed wrong by legacy middleboxes; pair the DSN check with the outbound header check.
+4. Is the serializer return value checked? `json_encode` returning `false` without a log entry is how `HTTP 200 body="false"` reaches production.
+
+**Verify**: `SHOW SESSION VARIABLES LIKE 'character_set_%'` — all three of `client` / `connection` / `results` must be `utf8mb4`. Then `curl -sD -` the endpoint with a row containing an emoji; body must be valid JSON starting with `[` or `{`, and `Content-Type` must contain `charset=utf-8`.
+
 ### Deep-Offset Pagination (LIMIT/OFFSET at depth)
 `LIMIT N OFFSET M` is **O(N+M)**, NOT O(N). The engine walks M+N rows through the chosen index, discards the first M, returns the tail. Under a narrowing predicate (`WHERE user_id = ?` → ~10k rows) the cost is invisible. On a large unpartitioned table with no filter it degrades catastrophically — page 1000 of a 50/page feed touches 50,050 index rows; page 100,000 touches 5M. Each slow request also pins a DB connection, so deep-offset is both latency and pool-exhaustion.
 
