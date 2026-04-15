@@ -589,6 +589,33 @@ Auth-at-the-edge (middleware/policy on the route) is safe ONLY while the service
 
 **Silent failure**: the web UI looks locked down in QA, the policy test suite is green, and a banned user still triggers the action via a weekly CLI job or a queue worker — because neither path touches middleware.
 
+### Session Lifecycle at Auth Boundaries (fixation, privilege upgrade, cookie drift)
+Authentication is an IDENTITY TRANSITION: the caller arrives as anonymous (or some other identity) and leaves as an authenticated principal. Every identity transition MUST rotate the session identifier AND re-assert the session cookie attributes — or the pre-transition session ID remains valid post-transition and whoever planted it is now logged in as the victim.
+
+Distinct from Auth Enforcement Parity (who-can-call a service across entry points): this reflex covers the identity-rebinding STEP itself.
+
+**Three failure modes:**
+
+1. **Session fixation** — login succeeds, principal is written into the existing session (`$_SESSION['user_id'] = ...`) WITHOUT first rotating the session ID. If the runtime accepts attacker-supplied session IDs (PHP with `session.use_strict_mode = 0`, hand-rolled cookie stores, any session system that mints on first touch without a server-side allowlist), an attacker who planted a session cookie on the victim now holds a valid authenticated session. Fix: rotate the session ID immediately after credentials verify and BEFORE writing the principal (e.g. PHP `session_regenerate_id(true)`).
+2. **Privilege upgrade without rotation** — same bug class at a different boundary: a logged-in user becomes admin / enters sudo / completes 2FA step-up. If the session ID is not rotated at the upgrade, a pre-upgrade token captured at a lower trust level now grants the higher trust level. Rotate on every trust-level change, not just at initial login.
+3. **Cookie attribute drift** — setting cookie params (remember-me lifetime, `Secure`, `HttpOnly`, `SameSite`, `Domain`) AFTER the session has already started silently does NOT apply to the already-issued cookie for the current request. Correct order: set params → rotate session ID → write principal → send response.
+
+**Audit reflex** — for every assignment into session state that follows a successful credential / MFA / role check in the diff:
+1. **Is the session ID rotated between credential-verify and principal-write?** Name the rotation call and its `delete_old_session` argument. Missing → BLOCKED.
+2. **Does the runtime reject unknown session IDs?** (`session.use_strict_mode` or equivalent.) If off, rotation is the ONLY defence — no excuses.
+3. **If cookie params changed, did the change happen BEFORE the rotation call?** Post-rotation param changes apply only to the NEXT session.
+4. **Is the OLD session server-side storage actually destroyed?** `session_regenerate_id(false)` leaves the old session file readable by whoever has the old ID — pass `true`.
+
+**Verification (command output):**
+```bash
+# 1. Pre-login session cookie:
+curl -c jar -b jar -s -o /dev/null -D - https://app/login | grep -i '^set-cookie'
+# 2. POST credentials re-using the same cookie jar:
+curl -c jar -b jar -s -o /dev/null -D - -d 'email=a&password=b' https://app/login | grep -i '^set-cookie'
+# 3. The Set-Cookie session-ID value from step 2 MUST differ from step 1.
+#    Same value → no rotation → session fixation present.
+```
+
 ### Frontend Reactivity Traps
 These cause bugs that no linter catches:
 - **Destructured reactive state**: Extracting values from reactive objects into plain variables loses reactivity. Always use computed/derived state.
