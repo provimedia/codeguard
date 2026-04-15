@@ -772,14 +772,9 @@ This keeps audit effort focused where this specific codebase actually has proble
 - **Output proportional to findings.** Clean code gets one line. Problems get detail. No empty sections.
 - **The thought "I don't need this for such a small change" is the trigger to run it.** Small changes cause production outages precisely because they skip review.
 
-### v4 Verification Rules (born from real bugs that escaped the audit)
+### v4 Verification Rules
 
-- **VERIFICATION beats ASSERTION.** Read code is not proof. The audit must produce command output.
-- **Dump the JSON, don't just read the keys.** When checking Cross-Layer Data Contracts, run the route and inspect the actual serialized payload — `paginate()->toArray()`, Inertia data-page JSON, or Playwright `evaluate()`. Read-only checks have ~50% false-positive rate based on observed bug data.
-- **Hunt-and-replace is mandatory.** After fixing one occurrence of a known pattern, GREP the entire codebase for the same pattern. Print "0 unfixed instances" or list the remaining ones. Fix-propagation is the most common audit failure mode.
-- **Layout-link → Route-existence.** When you change ANY layout component (TopNav, MobileTabBar, Footer, AdminLayout) that contains nav `<Link href>` / `<a href>`, run the link-click-test BEFORE claiming the audit passes. Every linked-to path must resolve to a registered GET route.
-- **Eloquent Accessors need `$appends`.** Every accessor (`getXxxAttribute`) that the Vue side reads MUST be in `$appends` OR explicitly mapped via `->map()` in the controller. If neither: `paginate()->toArray()` will skip it and Vue gets `undefined`.
-- **The Forbidden Phrase List.** "I read the code and it looks correct" / "the keys match" / "should work" / "this is the same pattern as before" — these are all FAILURE MODES. Replace each with a concrete command-output proof.
+- **VERIFICATION beats ASSERTION.** Read code is not proof. The audit must produce command output. The six reflexes this rule covers (JSON dump, hunt-and-replace, layout-link→route, accessor exposure, forbidden phrase list, read-check false-positive rate) are defined in depth in the Audit phase callout and in Cross-Layer Checks above — do not duplicate them here.
 
 ### v5 Plan-Time Rules (born from plan-time bugs, not code-time bugs)
 
