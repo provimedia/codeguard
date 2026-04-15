@@ -375,34 +375,18 @@ The audit runs every single time code is written or changed. It is never skipped
 > every new user from completing onboarding.
 >
 > **C) Layout-Link → Route Existence Check**
-> Every internal `<Link href>` / `<a href>` that appears in a layout component (TopNav, Footer,
-> AdminLayout, MobileTabBar, etc.) must resolve to a registered route. The audit must verify:
+> Every internal link in a layout/nav/shared component must resolve to a registered route.
+> Structural-match audits miss this: a handler returning the right keys says nothing about
+> whether the URL the nav links TO is even registered (wrong verb, typo, moved, never added).
 >
-> ```bash
-> # 1. Extract all internal hrefs from layout components
-> grep -hoE "url\(['\"]/[^'\"]+['\"]\)|href=['\"]/[^'\"#]+['\"]" \
->   resources/js/Layouts/*.vue resources/js/Components/{TopNav,MobileTabBar}.vue \
->   | sed -E "s|.*['\"](/[^'\"]+)['\"].*|\1|" | sort -u
+> **Verification (command output, not code reading):**
+> 1. Extract every internal href from nav/layout components into a list.
+> 2. List every GET route the router registers.
+> 3. Diff — any href not in the route list is a guaranteed 404 on click.
 >
-> # 2. List all GET routes
-> php artisan route:list --columns=method,uri | grep '^\s*GET' | awk '{print "/"$2}'
->
-> # 3. Diff: every nav-href must appear in the route list
-> ```
->
-> **Real bug this prevents:** TopNav linked to `/matches`. Only POST routes existed
-> (`/matches/{id}/annehmen`, `/matches/{id}/ablehnen`). No `Route::get('/matches')` was ever
-> registered. Every click on the Matches nav item → 404. The audit didn't catch it because
-> the subagent only checked that the controller's existing methods returned the right Inertia
-> keys — not that the linked-to route existed.
->
-> **The verification reflex:** if you wrote/changed any nav-link OR any controller that's the
-> target of a nav-link, run the link-click-test BEFORE claiming the audit passes:
->
-> ```bash
-> node tests/e2e/link-click-test.mjs
-> # Must report 0 errors. If it reports any, the audit is NOT passed.
-> ```
+> If the project has a link-click smoke test (headless browser walks every nav), run it
+> BEFORE claiming the audit passes; it must report 0 errors. If no such test exists, the
+> diff step above is mandatory — do not substitute "I read the routes file".
 
 **3a. Triage — Determine Audit Intensity**
 
