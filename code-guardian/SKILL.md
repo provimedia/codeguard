@@ -559,6 +559,7 @@ Vary: Cookie
 2. **Is `Vary: Cookie` (or `Vary: Authorization` for token auth) set?** Absent → BLOCKED.
 3. **Auth-failure redirects** (302s) are cacheable too — same headers on the redirect response.
 4. **Browser bfcache**: on logout, does the sensitive page still render from bfcache? `no-store` is the only directive that reliably evicts bfcache.
+5. **Defense-in-depth headers** when the body reflects any user-controlled content (XSS sink present or possible): `Content-Security-Policy` (strict `default-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, no `unsafe-inline`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (or `same-origin`), `Permissions-Policy` locking down unused features. Absent → BLOCKED — escaping at the sink is the first line; CSP is the second and they are NOT interchangeable.
 
 **Verification (command output):**
 ```bash
