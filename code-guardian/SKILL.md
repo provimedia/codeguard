@@ -768,12 +768,5 @@ This keeps audit effort focused where this specific codebase actually has proble
 
 ### v5 Plan-Time Rules (born from plan-time bugs, not code-time bugs)
 
-- **PLAN MODE is not optional when a spec/plan exists.** Run the 6 plan reflexes (P1-P6) BEFORE dispatching any implementation subagent. A bug locked in at plan-time cascades through every subagent and every review.
-- **Cross-Layer at plan-time means WALK THE PATH, not "$fillable will handle it".** Many controllers use explicit serialization whitelists. `Inertia::render(..., ['product' => ['key' => $val, ...]])` does NOT honor `$fillable`. Grep the controller BEFORE the plan is finalized.
-- **`->get()` is an OOM hazard for unbounded row counts.** Plans must specify `cursor()` or `lazy($n)` or `chunkById()` based on actual row count, not blindly inherit from existing commands.
-- **`->lazy($n)` overrides `->limit($n)`.** Laravel gotcha. If a plan needs both streaming AND a row cap, it must use `->cursor()`. `lazy()` is only safe when the chunk size IS the cap.
-- **API keys in URLs leak to logs.** Plans for new external API calls must specify header-based auth (`x-api-key`, `x-goog-api-key`, `Authorization: Bearer ...`). URL-based key parameters are forbidden.
-- **`env()` outside `config/*.php` breaks under `config:cache`.** Plans that introduce a new env var must include a `config/services.php` block AND read via `config('services.x.key')`.
-- **Pattern-copying propagates bugs.** When a plan says "follow the pattern of ExistingFile.php", audit ExistingFile.php for P1-P4 bugs FIRST. List inherited bugs to FIX, not to propagate.
-- **Subagent prompts on WIP branches MUST mandate hunk-level staging.** `git add <file>` sweeps in pre-existing WIP. Use `git add -p` with explicit "stage only these hunks" instructions, OR only use `git add <new-file>` for brand-new untracked files.
-- **Fix prescriptions themselves need review.** A code reviewer can correctly identify a bug AND prescribe a broken fix. When re-dispatching an implementer to fix quality issues, the fix prescription must be pre-validated (e.g., would `lazy(500)` actually work with this query shape? No — `cursor()` does). Don't trust your own review output blindly.
+- **PLAN MODE is not optional when a spec/plan exists.** Run the 6 plan reflexes (P1-P6) BEFORE dispatching any implementation subagent. A bug locked in at plan-time cascades through every subagent and every review. The reflex content lives in PLAN MODE above — do not duplicate it here.
+- **Fix prescriptions themselves need review.** A code reviewer can correctly identify a bug AND prescribe a broken fix. When re-dispatching an implementer to fix quality issues, pre-validate the prescription against the actual call/query shape before shipping it. Don't trust your own review output blindly.
