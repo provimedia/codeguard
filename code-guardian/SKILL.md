@@ -575,9 +575,7 @@ curl -b jar -s -o /dev/null -D - https://app/statement | grep -iE '^(cache-contr
 ```
 
 ### Error-Path Log Content Hygiene (PII / secrets in logs)
-Logs are a secondary data store — whatever lands in them inherits the weakest access control on ANY surface the log reaches: file permissions, backups, log-aggregator retention, SaaS vendor access, support screen-shares. An error-path logger that serializes opaque blobs is a secret-leak with a timer.
-
-Distinct from P3 Secrets Hygiene (secrets in URLs / webhook paths) and from Security layer's "sensitive fields in responses" (HTTP responses to callers). This reflex covers what gets written to the LOG sink on the error path.
+Logs are a secondary data store — whatever lands in them inherits the weakest access control on ANY surface the log reaches (file permissions, backups, log-aggregator retention, SaaS vendor access, support screen-shares). An error-path logger serializing opaque blobs is a secret-leak with a timer. Distinct from P3 (secrets in URLs) and from "sensitive fields in responses" (body content): this covers the LOG sink.
 
 **Forbidden log payloads** — never serialize wholesale into log lines:
 
@@ -615,9 +613,7 @@ Distinct from XSS (HTML body escaping) and P3 (secrets in URLs): this covers dat
 Verify: `curl -D -` on the endpoint after injecting a quote-breakout payload at write time; response MUST contain exactly one `Content-Disposition` parameter with no raw `"`, `\r`, `\n`, `\x00`, or non-ASCII outside `filename*=`.
 
 ### HTTP Verb Safety for State-Changing Requests (CSRF-on-GET)
-RFC 7231 defines GET and HEAD as **safe** (no side effects) and idempotent. Every mainstream CSRF middleware honours that contract and exempts GET/HEAD from token verification. A route registered as `GET` that mutates state (INSERT/UPDATE/DELETE, mail send, counter bump, external POST) is therefore an **unauthenticated cross-site write primitive** the instant a logged-in victim loads a page the attacker controls: `<img src="https://app/action">` fires the GET with the victim's session cookie (zero-click, no JS, no same-origin restriction). Link prefetchers, email link scanners (Outlook Safe Links, Gmail image proxy, corporate MTAs), and IM link previews (Slack/Discord/Teams) also pre-fetch every URL in their reach — tripping state-changing GETs before the user sees the message.
-
-Distinct from Session Lifecycle (auth boundaries), Open Redirect (destination), Header-Value Injection (header values), Cacheability (cross-user cache replay). This reflex covers the REQUEST VERB vs HANDLER SIDE-EFFECT mismatch.
+RFC 7231 marks GET/HEAD as **safe** and every mainstream CSRF middleware exempts them from token checks. A `GET` route that mutates state (INSERT/UPDATE/DELETE, mail, counter, external POST) is therefore a cross-site write primitive: `<img src="https://app/action">` fires it with the victim's cookie (zero-click, no JS). Link prefetchers, email-link scanners, and IM link previews also pre-fetch every URL in reach — tripping state-changing GETs before the user sees the message. Distinct from Session Lifecycle, Open Redirect, Header-Value Injection, and Cacheability: this covers the VERB vs SIDE-EFFECT mismatch.
 
 **Audit reflex** — for every route declaration in the diff:
 1. **Does the handler mutate persistent state or call a side-effecting external API?** Grep the handler body for `UPDATE` / `INSERT` / `DELETE` / `save` / `update` / `delete` / mail send / queue dispatch / external POST. Any match → the route MUST be POST/PUT/PATCH/DELETE, never GET or HEAD.
