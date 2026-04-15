@@ -143,8 +143,8 @@ P2 Scale Verification: PASS / FAIL
   Verified-by: <row count + chosen iteration method>
 P3 Secrets Hygiene: PASS / FAIL
   Verified-by: <grep for ?key= in plan content>
-P4 config:cache Safety: PASS / FAIL
-  Verified-by: <grep for env() in plan pseudocode>
+P4 Cached-Config Safety: PASS / FAIL
+  Verified-by: <grep for raw env reads in plan pseudocode>
 P5 Pattern Source Quality: PASS / FAIL
   Verified-by: <audit of referenced existing file>
 P6 WIP Staging Discipline: PASS / FAIL
