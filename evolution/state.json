@@ -1,5 +1,5 @@
 {
-  "iter": 49,
+  "iter": 50,
   "max_iter": 100,
   "baseline_score": 68,
   "last_good_commit": "dec12fb2e0c19a6a6b25266b801ac54b83191eb5",
@@ -12,10 +12,12 @@
   "direction": "generality_php_mysql_substrate",
   "skill_md_lines": 866,
   "last_benchmark": {
-    "iter": 40,
-    "fixture": "fixture-01.md",
+    "iter": 50,
+    "fixture": "fixture-02.md",
     "passed": true,
-    "caught": 5,
-    "expected": 4
+    "caught": 4,
+    "expected": 3,
+    "milestone": "halfway",
+    "note": "zero regression across 30 edits since iter-20; validates iter-41 P4 generalization"
   }
 }
