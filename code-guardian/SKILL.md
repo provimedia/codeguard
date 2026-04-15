@@ -664,10 +664,11 @@ These cause bugs that no linter catches:
 - **Stale closures**: Event handlers or watchers that capture a value at creation time instead of reading current state.
 
 ### N+1 Query Detection
-Watch for these patterns in any ORM:
+Watch for these patterns in any ORM OR external-call loop:
 - Accessing relationships inside a loop without prior eager loading
 - Counting related records in a loop instead of using aggregation
 - Loading full objects when only a count or existence check is needed
+- External HTTP/RPC call inside a row loop — require a bulk endpoint, `Http::pool()`, or justify per-row cost against the row count
 
 ---
 
