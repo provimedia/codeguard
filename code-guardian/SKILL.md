@@ -146,19 +146,12 @@ $key = config('services.gemini.key');
 
 ### P5. Pattern Source Quality Check
 
-When the plan instructs "follow the pattern of `ExistingFile.php`", the planner
-MUST first audit `ExistingFile.php` for the bugs above (P1-P4). Inherited bugs
-propagate silently because reviewers see "this matches the existing pattern" as
-approval.
+When the plan says "follow the pattern of `<referenced-file>`", audit that
+file against P1-P4 FIRST. Inherited bugs propagate silently because reviewers
+read "matches existing pattern" as approval.
 
-**Real bug from this session:** Plan said "follow `GenerateSeoTexts.php` pattern"
-which itself had `env('GEMINI_API_KEY')`, URL-based key, and `->get()` — all
-three plan-time bugs were copied into the new command verbatim. The reviewer
-caught them, but only because they audited the new code from first principles
-instead of trusting the source pattern.
-
-**Plan-time check:** `grep -n "env('\|->get()\|?key=\|?api_key=" <referenced-file>` —
-if any matches, the plan must call out which inherited bugs to FIX in the new
+**Plan-time check:** grep the referenced file for each P1-P4 anti-pattern.
+Any match → the plan must call out which inherited bugs to FIX in the new
 file, not which to copy.
 
 ### P6. WIP Staging Discipline for Subagent Briefings
@@ -182,10 +175,10 @@ when the controller dispatches the agent. By the time the audit catches the
 swept-in WIP, the commit is already created. Fix the briefing template, not
 the symptom.
 
-**Real bug from this session:** Implementer ran `git add app/Http/Controllers/ShopController.php`
-to stage the description_helpful fix, but the file already had pre-existing
-`category()` method WIP — both got bundled into one commit with an inaccurate
-message. Fix required `git commit --amend` for honest history.
+**Lesson:** `git add <path>` sweeps in any other uncommitted WIP that already
+sits in the same file. On a branch with pre-existing WIP, stage hunks
+(`git add -p`) and verify the diff before commit — otherwise unrelated work
+ships under an inaccurate message and history needs rewriting to untangle.
 
 ### Plan Mode Output
 
