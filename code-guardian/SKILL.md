@@ -629,6 +629,21 @@ When code references DB fields, verify against BOTH the Model AND the live DB:
 - Do relationship definitions match the actual FK columns in the DB?
 - Is the table name explicitly set if the model name doesn't follow convention?
 
+### Auth Enforcement Parity Across Entry Points
+When a service/domain method is invoked from MORE THAN ONE entry point — web route, CLI command, queue/background worker, scheduled task, admin panel, internal API, webhook handler — the authorization gate MUST be equivalent at every entry point, OR the gate must live INSIDE the service and not at the edge.
+
+Auth-at-the-edge (middleware/policy on the route) is safe ONLY while the service has exactly one caller. The moment a second entry point appears, the route-level gate is bypassed by design — middleware does not run for background workers or CLI invocations.
+
+**Audit reflex** — for every service method touched in the diff, run the consumer grep from BUILD Step 1d and for EACH caller answer out loud:
+
+1. **What auth check guards this entry point?** Name the middleware / policy / gate / inline check.
+2. **Is the check equivalent to every OTHER entry point's check?** A route gated by a policy (checks verified / not-banned / has-quota) is NOT equivalent to an admin route checking only an admin flag, and NOT equivalent to a CLI or queue caller with no gate.
+3. **If the gates differ, does the difference match intent?** An admin override that explicitly bypasses one invariant is acceptable IF documented AND the non-admin paths still enforce the others.
+
+**The fix is almost always the same**: push the authorization check INTO the service (it throws on failure regardless of caller). Edge-auth then becomes defense-in-depth, not the only line.
+
+**Silent failure**: the web UI looks locked down in QA, the policy test suite is green, and a banned user still triggers the action via a weekly CLI job or a queue worker — because neither path touches middleware.
+
 ### Frontend Reactivity Traps
 These cause bugs that no linter catches:
 - **Destructured reactive state**: Extracting values from reactive objects into plain variables loses reactivity. Always use computed/derived state.
