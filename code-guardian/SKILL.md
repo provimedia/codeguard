@@ -533,6 +533,21 @@ When code references DB fields, verify against BOTH the Model AND the live DB:
 - Do relationship definitions match the actual FK columns in the DB?
 - Is the table name explicitly set if the model name doesn't follow convention?
 
+### Single-Use Resource Consumption (token / coupon / one-time action replay)
+Whenever a DB row represents a single-use resource (password-reset token, email-verify token, magic-login code, one-time coupon, invite link, idempotency key, consumed webhook), the consumption MUST be enforced by an **atomic conditional UPDATE** whose `rowCount()` is checked BEFORE any follow-on side effect:
+
+```sql
+UPDATE t SET consumed_at = NOW(6)
+ WHERE id = :id AND consumed_at IS NULL AND expires_at > NOW(6)
+```
+Then in code: only if `$stmt->rowCount() === 1` proceed to change the password / grant access / apply the coupon. Otherwise reject as `already_used`.
+
+**Anti-pattern**: `SELECT consumed_at IS NULL → BEGIN → UPDATE users ... → UPDATE resets SET consumed_at = NOW() WHERE id = :id → COMMIT`. Two concurrent replays both pass the SELECT gate, both enter their own transaction, both UPDATE the user row, second silently overwrites first. Wrapping in a transaction does NOT fix it — transactions serialize writes to the same row but do NOT turn a prior read into a lock. `SELECT ... FOR UPDATE` works ONLY if the consumed-flag is re-checked AFTER the lock; the conditional-UPDATE + rowCount gate is simpler and less error-prone.
+
+**Audit reflex**: for every diff that touches a row with `consumed_at` / `used_at` / `redeemed_at` / `verified_at` / `processed_at` / `is_consumed`, grep the diff for `SELECT` followed by `UPDATE` on the same row — if the UPDATE lacks `WHERE ... AND <flag> IS NULL` OR the code doesn't check `rowCount() === 1` before the side effect, FAIL. Verified-by: a concurrent-replay script (`seq 1 20 | xargs -P20 -I{} curl ...`) should show exactly 1 success and 19 `already_used`.
+
+**Timestamp sub-reflex**: expiry / window checks MUST be evaluated in SQL (`WHERE expires_at > NOW(6)`) or via typed `DateTimeImmutable` comparison. Never compare two datetime strings lexicographically — MySQL may return `DATETIME(6)` with or without fractional seconds depending on how the row was inserted, and lex-compare of 19-char vs 26-char strings silently reorders around second boundaries.
+
 ### Auth Enforcement Parity Across Entry Points
 When a service/domain method is invoked from MORE THAN ONE entry point — web route, CLI command, queue/background worker, scheduled task, admin panel, internal API, webhook handler — the authorization gate MUST be equivalent at every entry point, OR the gate must live INSIDE the service and not at the edge.
 
