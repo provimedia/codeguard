@@ -507,8 +507,6 @@ Auth-at-the-edge (middleware/policy on the route) is safe ONLY while the service
 
 **The fix is almost always the same**: push the authorization check INTO the service (it throws on failure regardless of caller). Edge-auth then becomes defense-in-depth, not the only line.
 
-**Silent failure**: the web UI looks locked down in QA, the policy test suite is green, and a banned user still triggers the action via a weekly CLI job or a queue worker — because neither path touches middleware.
-
 ### Session Lifecycle at Auth Boundaries (fixation, privilege upgrade, cookie drift)
 Authentication is an IDENTITY TRANSITION: the caller arrives as anonymous (or some other identity) and leaves as an authenticated principal. Every identity transition MUST rotate the session identifier AND re-assert the session cookie attributes — or the pre-transition session ID remains valid post-transition and whoever planted it is now logged in as the victim.
 
