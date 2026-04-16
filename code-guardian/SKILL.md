@@ -887,10 +887,7 @@ This keeps audit effort focused where this specific codebase actually has proble
 - **The audit ALWAYS runs after code is written.** No exception. No "it's just a small change". No "I'll check later". Triage determines intensity per layer, but all 5 layers are checked every time — at minimum as spot-check.
 - **Live DB beats any static file.** Always query the real database when DB access is available.
 - **No DB access?** Ask once. If unavailable, run audit without DB layer and mark it "⚠️ DB unchecked".
-- **ORM-aware.** Eloquent, Prisma, etc. — read model definitions and verify against live DB columns.
-- **One consolidated MySQL query.** Never run 4 separate introspection queries.
 - **Output proportional to findings.** Clean code gets one line. Problems get detail. No empty sections.
-- **The thought "I don't need this for such a small change" is the trigger to run it.** Small changes cause production outages precisely because they skip review.
 
 ### v4 Verification Rules
 
