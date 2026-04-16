@@ -303,7 +303,7 @@ Even a 1-line change gets all 5 layers as spot-check. There is no "skip".
 
 **Logic** — Dead code? Unused variables? Unhandled edge cases (null, 0, empty string, empty array)? Missing returns in conditional paths? Off-by-one? Raw environment-variable reads outside the project's single config layer — runtimes that snapshot config at boot return null post-cache, so the service silently falls through to defaults only in production (see PLAN MODE P4 Cached-Config Safety)?
 
-**Efficiency** — Loops replaceable by single query? Sequential awaits that could be parallel? SELECT in loop instead of JOIN? Missing pagination on large sets?
+**Efficiency** — Loops replaceable by single query? Sequential awaits that could be parallel? SELECT in loop instead of JOIN? Missing pagination on large sets? `ORDER BY RAND()` over any filtered set larger than a few hundred rows — MySQL assigns RAND() per row then filesorts the WHOLE filtered set to return LIMIT k, so cost is O(filtered rows) regardless of LIMIT and indexes on the WHERE are irrelevant to the sort; fix by sampling on an indexed id (`WHERE id >= FLOOR(RAND()*max_id) ... LIMIT k`), precomputing a shuffled pool, or picking k random ids first and then fetching by PK.
 
 **Redundancy** — Duplicated logic? Utility already exists in codebase? Copy-paste that should be abstracted?
 
