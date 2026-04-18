@@ -1,0 +1,9 @@
+.DS_Store
+*.swp
+*.swo
+
+# Local development / evolution artifacts — not for public repo
+evolution/
+run-iteration.md
+deploy.sh
+readme.txt
