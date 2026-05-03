@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 #
-# Code Guardian Skill Installer (v5)
+# Code Guardian Skill Installer (v6)
 # ---------------------------------
 # Installs / updates the code-guardian skill for Claude Code.
 # Works on macOS and Linux.
+#
+# v6 changes: ships a tools/ directory with three helper scripts
+# (detect-secrets.sh, detect-clones.py, detect-config-leaks.sh)
+# referenced by the new R1-R5 redundancy reflexes in the audit phase.
 #
 # Usage:
 #   ./install.sh                 # Install to ~/.claude/skills/code-guardian/
@@ -77,6 +81,11 @@ if [ "$DRY_RUN" -eq 0 ]; then
     cp -R "$SOURCE_DIR" "$TARGET_DIR"
 fi
 
+# Make helper scripts executable (v6+)
+if [ "$DRY_RUN" -eq 0 ] && [ -d "$TARGET_DIR/tools" ]; then
+    chmod +x "$TARGET_DIR/tools/"*.sh "$TARGET_DIR/tools/"*.py 2>/dev/null || true
+fi
+
 # Verify
 if [ "$DRY_RUN" -eq 0 ]; then
     if [ -f "$TARGET_DIR/SKILL.md" ]; then
@@ -85,14 +94,31 @@ if [ "$DRY_RUN" -eq 0 ]; then
     else
         die "Installation verification failed: $TARGET_DIR/SKILL.md missing"
     fi
+    # tools/ check (v6+)
+    tool_count=0
+    for tool in detect-secrets.sh detect-clones.py detect-config-leaks.sh; do
+        if [ -x "$TARGET_DIR/tools/$tool" ]; then
+            tool_count=$((tool_count + 1))
+        fi
+    done
+    if [ "$tool_count" -eq 3 ]; then
+        ok "Helper scripts installed ($tool_count/3 executable in tools/)"
+    else
+        warn "Helper scripts incomplete ($tool_count/3) — R1-R5 redundancy reflexes may not work"
+    fi
 fi
 
-# Version check — confirm v5 markers are present
+# Version check — confirm v5 + v6 markers are present
 if [ "$DRY_RUN" -eq 0 ]; then
     if grep -q "PLAN MODE (v5" "$TARGET_DIR/SKILL.md" && grep -q "v5 Plan-Time Rules" "$TARGET_DIR/SKILL.md"; then
         ok "v5 plan-time reflexes detected in installed SKILL.md"
     else
         warn "v5 markers not found — installed version may be outdated"
+    fi
+    if grep -q "v6 Redundancy Rules" "$TARGET_DIR/SKILL.md" && grep -q "R1\. Hardcoded Secrets" "$TARGET_DIR/SKILL.md"; then
+        ok "v6 redundancy reflexes (R1-R5) detected in installed SKILL.md"
+    else
+        warn "v6 redundancy markers not found — installed version may be outdated"
     fi
 fi
 

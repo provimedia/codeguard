@@ -1,5 +1,5 @@
 ========================================================================
-  Code Guardian Skill — v5 (Plan-Mode Edition)
+  Code Guardian Skill — v6 (Redundancy-Reflex Edition)
   Claude Code installation package
 ========================================================================
 
@@ -8,7 +8,19 @@ WHAT IS THIS
 Code Guardian is a mandatory audit skill for Claude Code that prevents
 bugs by enforcing:
 
-  • PLAN-TIME reflexes (v5 — NEW)
+  • REDUNDANCY reflexes (v6 — NEW)
+      R1 Hardcoded Secrets / Credential Duplication
+         (known-prefix scan: AIza, sk-, AKIA, ghp_, JWT, Slack/Discord
+          webhooks, private-key blocks; same-secret-in-2+-files detector)
+      R2 Cross-File Code Clones (function-body hash, normalized)
+      R3 Cross-File Template/Markup Clones (HTML/Blade/Vue blocks ≥ 200ch)
+      R4 Config-as-Code Leaks (URL/email/absolute-path duplicated 2+ files)
+      R5 Cross-File Query Clones (Eloquent chain / SQL fragment)
+      Pre-Flight 1c expanded into 1c.1/1c.2/1c.3 (secret/function/template
+      pre-search) — prevents duplicates BEFORE the first edit, not after.
+      Three helper scripts ship in code-guardian/tools/.
+
+  • PLAN-TIME reflexes (v5)
       P1 Cross-Layer Trace for every new field (DB → Model → Controller → Vue)
       P2 Scale Verification (cursor/lazy/get based on row count)
       P3 Secrets Hygiene (header-based auth, never URL key params)
@@ -32,11 +44,19 @@ a concrete real-bug citation in the SKILL.md file.
 
 PACKAGE CONTENTS
 ----------------
-code-guardian-skill-v5.zip
+code-guardian-skill-v6.zip
 ├── install.sh                  ← automated installer (macOS + Linux)
 ├── readme.txt                  ← this file
 └── code-guardian/
-    └── SKILL.md                ← the skill definition (~715 lines)
+    ├── SKILL.md                ← the skill definition (~1080 lines)
+    └── tools/                  ← v6 helper scripts (R1-R5 reflexes)
+        ├── detect-secrets.sh           ← R1: known-prefix + dup-secret scan
+        ├── detect-clones.py            ← R2/R3/R5: cross-file clone hashing
+        └── detect-config-leaks.sh      ← R4: duplicated URL/email/path
+
+The helper scripts are zero-dependency (POSIX bash + Python 3 stdlib).
+Each emits a SUMMARY footer line that the skill paste as "Verified-by"
+proof in the audit report. Exit code = 1 on findings, 0 if clean.
 
 
 INSTALLATION
@@ -62,8 +82,16 @@ Prerequisite: Claude Code is already installed on the target machine.
      • Back up any existing code-guardian installation to
        ~/.claude/skills/code-guardian.backup.YYYYMMDD-HHMMSS
      • Copy the new SKILL.md into ~/.claude/skills/code-guardian/
+     • Make tools/*.sh and tools/*.py executable
      • Verify the v5 plan-time reflexes are present
+     • Verify the v6 redundancy reflexes (R1-R5) are present
      • Print next steps
+
+   Prerequisites for the v6 helper scripts:
+     • bash (any version, including macOS 3.2)
+     • python3 (any 3.x; uses stdlib only — no pip install needed)
+     • grep, awk, sed, sort, uniq (POSIX core utils)
+   No npm, no composer, no pip, no homebrew packages required.
 
 4. Installer options:
 
@@ -91,6 +119,25 @@ POST-INSTALL VERIFICATION
       grep "PLAN MODE (v5" ~/.claude/skills/code-guardian/SKILL.md
 
    Should return 1 match.
+
+4. Verify v6 redundancy reflexes are loaded:
+
+      grep "v6 Redundancy Rules" ~/.claude/skills/code-guardian/SKILL.md
+      ls -1 ~/.claude/skills/code-guardian/tools/
+
+   First should return 1 match. ls should print:
+      detect-clones.py
+      detect-config-leaks.sh
+      detect-secrets.sh
+
+5. Smoke-test the helper scripts against any code repository:
+
+      bash ~/.claude/skills/code-guardian/tools/detect-secrets.sh /path/to/repo
+      bash ~/.claude/skills/code-guardian/tools/detect-config-leaks.sh /path/to/repo
+      python3 ~/.claude/skills/code-guardian/tools/detect-clones.py \
+              --root /path/to/repo --kind code --cross-file-only
+
+   Each should end with a "SUMMARY findings=N ... exit=0|1" line.
 
 
 UNINSTALL
@@ -154,6 +201,21 @@ flow ensures the old version is preserved.
 
 VERSION HISTORY
 ---------------
+v6 (2026-05-03) — Redundancy reflex layer added. Five reflexes
+                  (R1-R5) replace the previous one-line Redundancy
+                  spot-check: hardcoded-secret duplication detection,
+                  cross-file code-clone hashing, template-block
+                  duplication, config-leak (URL/email/path) detection,
+                  cross-file Eloquent/SQL clone hashing. Pre-Flight 1c
+                  expanded to 1c.1/1c.2/1c.3 (secret/function/template
+                  pre-search). Three helper scripts ship in tools/,
+                  zero-dependency, each emitting a SUMMARY footer for
+                  paste-as-Verified-by. Born from real bugs: hardcoded
+                  Gemini API key duplicated across 4 files, sitemap
+                  generation logic duplicated controller↔command,
+                  validation Eloquent chains duplicated across
+                  controllers (security divergence risk).
+
 v5 (2026-04-15) — Plan Mode added. Six plan-time reflexes (P1-P6)
                   born from Product Helpful Text feature session:
                   cross-layer trace at plan-time, scale verification,
