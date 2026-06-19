@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Code Guardian Skill Installer (v5)
-# ---------------------------------
+# Code Guardian Skill Installer (v7.1)
+# -----------------------------------
 # Installs / updates the code-guardian skill for Claude Code.
 # Works on macOS and Linux.
 #
@@ -16,7 +16,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="${SCRIPT_DIR}/code-guardian"
 TARGET_ROOT="${HOME}/.claude/skills"
 TARGET_DIR="${TARGET_ROOT}/code-guardian"
-BACKUP_DIR="${TARGET_ROOT}/code-guardian.backup.$(date +%Y%m%d-%H%M%S)"
+# Backups live OUTSIDE the skills root — a backup placed under skills/ is
+# auto-discovered by Claude Code as a duplicate skill (it has a SKILL.md).
+BACKUP_ROOT="${HOME}/.claude/skill-backups"
+BACKUP_DIR="${BACKUP_ROOT}/code-guardian.backup.$(date +%Y%m%d-%H%M%S)"
 
 FORCE=0
 DRY_RUN=0
@@ -43,6 +46,10 @@ die()  { printf '\033[0;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
 # Sanity checks
 [ -d "$SOURCE_DIR" ] || die "Source directory not found: $SOURCE_DIR"
 [ -f "$SOURCE_DIR/SKILL.md" ] || die "SKILL.md not found in source: $SOURCE_DIR/SKILL.md"
+[ -d "$SOURCE_DIR/tools" ] || die "tools/ directory not found in source: $SOURCE_DIR/tools"
+for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh; do
+    [ -f "$SOURCE_DIR/tools/$tool" ] || die "Helper script missing: $SOURCE_DIR/tools/$tool"
+done
 
 log "Source:  $SOURCE_DIR"
 log "Target:  $TARGET_DIR"
@@ -65,6 +72,7 @@ if [ -d "$TARGET_DIR" ]; then
     else
         log "Existing installation found — backing up to $BACKUP_DIR"
         if [ "$DRY_RUN" -eq 0 ]; then
+            mkdir -p "$BACKUP_ROOT"
             mv "$TARGET_DIR" "$BACKUP_DIR"
         fi
         ok "Backup created: $BACKUP_DIR"
@@ -85,14 +93,37 @@ if [ "$DRY_RUN" -eq 0 ]; then
     else
         die "Installation verification failed: $TARGET_DIR/SKILL.md missing"
     fi
+    if [ -d "$TARGET_DIR/tools" ]; then
+        tool_count=$(find "$TARGET_DIR/tools" -maxdepth 1 -type f \( -name '*.sh' -o -name '*.py' \) | wc -l | tr -d ' ')
+        ok "tools/ installed ($tool_count helper script(s))"
+        chmod +x "$TARGET_DIR/tools"/*.sh "$TARGET_DIR/tools"/*.py 2>/dev/null || true
+    else
+        die "Installation verification failed: $TARGET_DIR/tools missing"
+    fi
 fi
 
-# Version check — confirm v5 markers are present
+# Version check — confirm v10 structural markers + shipped features are present
 if [ "$DRY_RUN" -eq 0 ]; then
-    if grep -q "PLAN MODE (v5" "$TARGET_DIR/SKILL.md" && grep -q "v5 Plan-Time Rules" "$TARGET_DIR/SKILL.md"; then
-        ok "v5 plan-time reflexes detected in installed SKILL.md"
+    missing=()
+    grep -q "Code Guardian (v10)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v10)")
+    grep -q "PLAN MODE"                        "$TARGET_DIR/SKILL.md" || missing+=("PLAN MODE")
+    grep -q "BUILD MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("BUILD MODE")
+    grep -q "DEBUG MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("DEBUG MODE")
+    grep -q "Blast-Radius Council Gate"        "$TARGET_DIR/SKILL.md" || missing+=("Blast-Radius Council Gate")
+    grep -q "detect-symbol-loss.py"            "$TARGET_DIR/SKILL.md" || missing+=("symbol-loss gate (SKILL.md)")
+    [ -f "$TARGET_DIR/tools/detect-symbol-loss.py" ] || missing+=("tools/detect-symbol-loss.py")
+    if [ ${#missing[@]} -eq 0 ]; then
+        ok "v10 markers + symbol-loss gate detected in installed skill"
     else
-        warn "v5 markers not found — installed version may be outdated"
+        warn "Missing markers: ${missing[*]} — installed version may be outdated"
+    fi
+
+    # llm-council skill is an optional but recommended companion (v7 Council Gate)
+    if [ -d "${HOME}/.claude/skills/llm-council" ] || [ -L "${HOME}/.claude/skills/llm-council" ]; then
+        ok "Companion skill detected: llm-council (v7 Council Gate is operational)"
+    else
+        warn "Companion skill 'llm-council' not installed — v7 Council Gate will be skipped at runtime"
+        warn "Install llm-council into ~/.claude/skills/llm-council to enable Phase 3 + Escalation council triggers"
     fi
 fi
 

@@ -224,9 +224,14 @@ Council verdict (if fired): <Recommendation> — <One Thing to Do First>
 
 The edits you actually made are new evidence. After writing code:
 
-1. `git diff --name-only HEAD` + read the hunks; **re-seed the QUEUE** with every symbol whose contract the edits actually altered. Flag change-kinds you didn't foresee.
-2. Re-run the 1d loop to fixpoint on those seeds.
-3. Reconcile the LEDGER: every PROPAGATES node is now (a) fixed AND verified at its call site, or (b) re-classified with a reason. One open PROPAGATES node = the change is not done, regardless of how green the original file looks.
+1. **Symbol-loss gate (mechanical, before you re-seed by hand).** A re-seed driven by reading the diff can skip a symbol you didn't notice you dropped — especially after a full-file `Write` or a large refactor that regenerates a file from memory. Run the detector over the diff first; it reports every function/method/class that disappeared or changed signature, using `git show <ref>:<file>` as the before-image:
+   ```bash
+   python3 ~/.claude/skills/code-guardian/tools/detect-symbol-loss.py --git
+   ```
+   Reconcile each `LOST` / `CHANGED` line against the 1d LEDGER: present as an **intended** removal/signature change → fine; **absent** from the LEDGER → a symbol you dropped or altered without tracing its consumers — restore it, or seed `(symbol, Deletion|Signature, origin)` into the QUEUE. `MOVED` (lost here, re-defined in another changed file) is informational. **Scope:** the tool sees names + signatures, not behaviour — a same-signature body rewrite is invisible to it and still needs the audit + tests. Paste the `SUMMARY findings=…` footer as Verified-by.
+2. `git diff --name-only HEAD` + read the hunks; **re-seed the QUEUE** with every symbol whose contract the edits actually altered — the gate above names the structural losses; you still add the semantic/side-effect change-kinds it cannot see. Flag change-kinds you didn't foresee.
+3. Re-run the 1d loop to fixpoint on those seeds.
+4. Reconcile the LEDGER: every PROPAGATES node is now (a) fixed AND verified at its call site, or (b) re-classified with a reason. One open PROPAGATES node = the change is not done, regardless of how green the original file looks.
 
 A symbol the plan-time LEDGER missed is itself a finding — note why 1d under-scoped it in `.audit-log.md`.
 
@@ -337,7 +342,7 @@ Never propose just one fix.
 
 ### Phase 5: IMPLEMENT + VERIFY
 
-1. Fix + adjust all affected dependencies → 2. test reproducing the bug (now green) → 3. existing tests still green → 4. confirm bug gone, edge cases handled, dependencies intact → 5. run the BUILD Audit (3a–3g) on the fix diff — a fix is a code change like any other.
+1. Fix + adjust all affected dependencies → 2. test reproducing the bug (now green) → 3. existing tests still green → 4. confirm bug gone, edge cases handled, dependencies intact → 5. run the BUILD post-change symbol-loss gate (Step 2.1) so the fix didn't silently drop a sibling function, then the Audit (3a–3g) on the fix diff — a fix is a code change like any other.
 
 ### Escalation
 
