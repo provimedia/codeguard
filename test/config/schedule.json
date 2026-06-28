@@ -1,0 +1,15 @@
+{
+  "timezone": "Europe/Berlin",
+  "jobs": [
+    {
+      "cron": "0 6 1 * *",
+      "job": "App\\Jobs\\GenerateMonthlyReportJob",
+      "description": "Build the monthly report on the 1st at 06:00"
+    },
+    {
+      "cron": "*/15 * * * *",
+      "command": "inventory:sync --full",
+      "description": "Sync the partner inventory feed"
+    }
+  ]
+}
