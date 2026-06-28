@@ -14,3 +14,9 @@ def test_two_site_clone_is_note_only_three_is_extract_candidate():
     out3 = _run(d).stdout
     assert "EXTRACT-CANDIDATE" in out3
     assert "wrong abstraction" in out3.lower()
+
+
+if __name__ == "__main__":
+    # Standalone runner so the test validates without pytest (not installed in CI here).
+    test_two_site_clone_is_note_only_three_is_extract_candidate()
+    print("PASS")
