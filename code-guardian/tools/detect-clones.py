@@ -216,6 +216,9 @@ def main(argv):
                     help="for kind=code: leading body lines hashed (default 5)")
     ap.add_argument("--cross-file-only", action="store_true",
                     help="ignore clone groups confined to a single file")
+    ap.add_argument("--extract-threshold", type=int, default=3,
+                    help="min occurrences before a clone is an EXTRACT-CANDIDATE "
+                         "(Rule of Three); fewer => NOTE-ONLY (default 3)")
     ap.add_argument("--exclude", default=DEFAULT_EXCLUDE,
                     help="path-relative regex to exclude")
     ap.add_argument("--json", action="store_true",
@@ -289,10 +292,17 @@ def main(argv):
             print(json.dumps(obj))
     else:
         kind_label = {"code": "R2", "html": "R3", "sql": "R5"}[args.kind]
+        if any(len(locs) >= args.extract_threshold for _, locs in flagged):
+            print("# CAUTION: duplication is cheaper than the wrong abstraction. "
+                  "Extract only when the sites encode the SAME knowledge (one reason to change). "
+                  "NOTE-ONLY groups (<%d sites) are below the Rule of Three — leave them.\n"
+                  % args.extract_threshold)
         for sig, locs in flagged:
             distinct_files = sorted({l[0] for l in locs})
+            label = ("EXTRACT-CANDIDATE" if len(locs) >= args.extract_threshold
+                     else "NOTE-ONLY")
             print(f"{kind_label}.{args.kind} clone-group "
-                  f"hash={sig} locs={len(locs)} files={len(distinct_files)}")
+                  f"hash={sig} locs={len(locs)} files={len(distinct_files)} {label}")
             for rel, ln, sym, _ in locs[:10]:
                 print(f"  {rel}:{ln} :: {sym}")
             if len(locs) > 10:
