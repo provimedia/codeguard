@@ -169,13 +169,13 @@ git diff --name-only HEAD
 | 20+ lines | No | STANDARD — all layers full depth except DB (spot-check) |
 | 20+ lines | Yes | FULL — all 5 layers full depth |
 
-Spot-check = scan for obvious violations. Full depth = exhaustive — **load `references/audit-deep-checks.md`** for each full-depth layer, and `references/cross-layer-checks.md` on STANDARD/FULL. Even a 1-line change gets all 5 layers as spot-check; there is no skip — but a spot-check that matches a cross-layer index row escalates that one reflex to full depth.
+Spot-check = scan for obvious violations. Full depth = exhaustive — **load `references/audit-deep-checks.md`** for each full-depth layer, and `references/cross-layer-checks.md` on STANDARD/FULL. Even a 1-line change gets all layers as spot-check; there is no skip — but a spot-check that matches a cross-layer index row escalates that one reflex to full depth. The **Self-Slop Sweep runs at EVERY intensity including LIGHT** — it is cheap (one diff scan) and slop hides in small diffs too; it only ever inspects the current diff.
 
 **3b. Read** all changed files completely, plus calling/called context.
 
 **3c. Audit log history** — read `.audit-log.md`; a category that fired recently in this codebase escalates from spot-check to full depth.
 
-**3d. Analyze — five layers.** ⚡ On FULL intensity, dispatch the five layers as parallel subagents (each gets: the diff, its layer's deep-check section from `references/audit-deep-checks.md`, and the verification rule; each returns findings with command-output proof). On LIGHT/FOCUSED/STANDARD run inline:
+**3d. Analyze — six layers.** ⚡ On FULL intensity, dispatch the layers as parallel subagents (each gets: the diff, its layer's deep-check section from `references/audit-deep-checks.md`, and the verification rule; each returns findings with command-output proof). On LIGHT/FOCUSED/STANDARD run inline:
 
 - **DB Integrity** — fields match live schema; FKs correct and not runtime-bypassed; indexes on queried columns; money never FLOAT; locale-safe numeric parsing; counter capacity. Full depth → reference §Layer Deep Checks.
 - **Logic** — dead code, unhandled edge cases (null/0/negative/empty), missing returns in branches, off-by-one, raw env reads outside config (P4).
@@ -192,6 +192,11 @@ Spot-check = scan for obvious violations. Full depth = exhaustive — **load `re
 
   Failure conditions, fixes, severity mapping, and `.code-guardian-redundancy.yml` overrides → reference §R1–R5.
 - **Security** — SQL injection, sensitive fields in responses, missing auth, JWT alg pinning, unsafe sinks (`unserialize`/`include`/`shell_exec`/`eval`/XXE), mass assignment, rate-limit key scope (attacker-rotatable keys are not rate limits; mask IPv6 to /64), IDOR. Full depth → reference §Security Layer.
+- **Self-Slop Sweep (always-on, diff-only — the agent cleans up after ITSELF).** Strip the AI-slop *this change* introduced; scope is the current diff, never pre-existing code (that is opt-in CLEANUP MODE — `references/cleanup-mode.md`). Run:
+  ```bash
+  python3 ~/.claude/skills/code-guardian/tools/detect-dead-code.py --diff-slop
+  ```
+  Act on each label: **REMOVABLE** (a symbol you added with zero references anywhere) → remove it; **DEBUG-LEFTOVER** (`var_dump`/`dd`/`dump`/`console.log`/`print`/`print_r`, or `TODO`/`FIXME`/`PLACEHOLDER`/`example` you just added) → remove it; **REVIEW** (added, currently unreferenced, but matches a route/handler/command/component entry-point pattern) → keep, it is likely wired up next. The tool catches the **mechanical** slop reliably (unused additions, debug lines). It does NOT catch **semantic** slop — those you remove by reading: a comment that merely restates the next line → delete; a single-use abstraction you just invented (interface/factory/wrapper with exactly one caller) → inline it (YAGNI / Rule of Three); a helper you wrote that duplicates one your 1c.2 pre-flight grep should have found → reuse the existing one (grep the tree for it); any *new* dependency/import → confirm the package actually exists (anti-slopsquatting). This layer removes ONLY your own just-written additions; if a removal would touch anything present before this diff, stop and report instead (that is CLEANUP MODE's job, and it is report-only). **Verified-by**: paste the `--diff-slop` `SUMMARY findings=… exit=…` footer.
 
 **3e. Report.**
 

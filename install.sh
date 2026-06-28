@@ -47,7 +47,7 @@ die()  { printf '\033[0;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
 [ -d "$SOURCE_DIR" ] || die "Source directory not found: $SOURCE_DIR"
 [ -f "$SOURCE_DIR/SKILL.md" ] || die "SKILL.md not found in source: $SOURCE_DIR/SKILL.md"
 [ -d "$SOURCE_DIR/tools" ] || die "tools/ directory not found in source: $SOURCE_DIR/tools"
-for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh; do
+for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh detect-symbol-loss.py detect-dead-code.py; do
     [ -f "$SOURCE_DIR/tools/$tool" ] || die "Helper script missing: $SOURCE_DIR/tools/$tool"
 done
 
@@ -102,18 +102,21 @@ if [ "$DRY_RUN" -eq 0 ]; then
     fi
 fi
 
-# Version check — confirm v10 structural markers + shipped features are present
+# Version check — confirm v11 structural markers + shipped features are present
 if [ "$DRY_RUN" -eq 0 ]; then
     missing=()
-    grep -q "Code Guardian (v10)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v10)")
+    grep -q "Code Guardian (v11)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v11)")
     grep -q "PLAN MODE"                        "$TARGET_DIR/SKILL.md" || missing+=("PLAN MODE")
     grep -q "BUILD MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("BUILD MODE")
     grep -q "DEBUG MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("DEBUG MODE")
+    grep -q "CLEANUP MODE"                     "$TARGET_DIR/SKILL.md" || missing+=("CLEANUP MODE")
+    grep -q "Self-Slop Sweep"                  "$TARGET_DIR/SKILL.md" || missing+=("Self-Slop Sweep")
     grep -q "Blast-Radius Council Gate"        "$TARGET_DIR/SKILL.md" || missing+=("Blast-Radius Council Gate")
     grep -q "detect-symbol-loss.py"            "$TARGET_DIR/SKILL.md" || missing+=("symbol-loss gate (SKILL.md)")
     [ -f "$TARGET_DIR/tools/detect-symbol-loss.py" ] || missing+=("tools/detect-symbol-loss.py")
+    [ -f "$TARGET_DIR/tools/detect-dead-code.py" ] || missing+=("tools/detect-dead-code.py")
     if [ ${#missing[@]} -eq 0 ]; then
-        ok "v10 markers + symbol-loss gate detected in installed skill"
+        ok "v11 markers + symbol-loss + dead-code gates detected in installed skill"
     else
         warn "Missing markers: ${missing[*]} — installed version may be outdated"
     fi

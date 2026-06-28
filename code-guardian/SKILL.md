@@ -13,13 +13,15 @@ description: >
   models, migrations — anything used in multiple places.
   TRIGGER PHRASES: "change", "update", "add", "fix", "refactor", "integrate", "build", "create",
   "implement", "aendere", "fuege hinzu", "fixe", "baue", "erstelle", "implementiere".
+  Use when (opt-in CLEANUP MODE): "clean up", "räum auf", "aufräumen", "dead code", "toten Code",
+  "unused", "ungenutzt", "orphan", "verwaist", "redundant", "remove duplicates" — report-only, never deletes productive code.
   ANTI-RATIONALIZATION: If you think "this is too small to need an audit" — that IS the trigger.
   If you think "I already understand this" — that IS the trigger.
   If you think "the user is waiting, just do it quickly" — that IS the trigger.
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v10)
+# Code Guardian (v11)
 
 ## Operating Principles
 
@@ -27,7 +29,7 @@ Stated once; they govern every mode below. The skill defines goals and gates —
 
 1. **Evidence over assertion.** Before reporting progress or a verdict, audit each claim against a tool result from this session. Only report work you can point to evidence for; if something is not yet verified, say so explicitly. "Ran X, got Y" with pasted output is proof. "I read the code and it looks right" is not.
 2. **Act when ready.** Run a reflex, record the result, move on. Do not re-derive established facts, re-litigate decided questions, or narrate checks you will not run. Pre-flight is preparation for action, not a substitute for it.
-3. **Stay in scope.** Findings outside the current diff are *reported*, never silently fixed. No refactoring, tidying, or new abstractions beyond the task. A bug fix doesn't need surrounding cleanup.
+3. **Stay in scope — with one carve-out for your own mess.** Findings in code that existed *before this change* are *reported*, never silently fixed or deleted — no refactoring, tidying, or new abstractions beyond the task; a bug fix doesn't need surrounding cleanup. The one exception: AI-slop *this change itself* introduced (unused symbols/imports you just added, debug leftovers, redundant comments, single-use abstractions you just invented) IS in scope — strip it before "done" (the always-on Self-Slop Sweep, `references/build-mode.md` Step 3). Cleaning up pre-existing dead/orphaned/redundant code is a separate, opt-in, **report-only** path (CLEANUP MODE) that never deletes on its own.
 4. **Fan out independent work.** When items are independent — consumers to classify, audit layers to verify, hypotheses to argue — dispatch parallel subagents instead of iterating serially. Marked ⚡ in the mode files. Subagents receive: the exact check to run, the diff/symbol context, and the required output format (verdict + command output).
 5. **Write down what you learn.** `.audit-log.md` (findings & patterns), `.code-guardian-propagation.md` (open worklists for large changes). Consult both at the start of a run; keep them current. One lesson per entry, with why it mattered.
 
@@ -35,11 +37,13 @@ Stated once; they govern every mode below. The skill defines goals and gates —
 
 ```
 Task received
-  ├─ Bug/Error/Broken? ──→ DEBUG MODE
-  ├─ Spec/Plan exists? ──→ PLAN MODE (review plan before implementation)
-  └─ Build/Change/Fix?  ──→ BUILD MODE
+  ├─ Bug/Error/Broken? ───────→ DEBUG MODE
+  ├─ Spec/Plan exists? ───────→ PLAN MODE (review plan before implementation)
+  ├─ Explicit "clean up / remove dead/unused/redundant EXISTING code"?
+  │                          ──→ CLEANUP MODE (opt-in, report-only — never deletes)
+  └─ Build/Change/Fix?  ──────→ BUILD MODE
                               ├─ Pre-Flight (BEFORE code)
-                              └─ Audit (AFTER code)
+                              └─ Audit (AFTER code, incl. always-on Self-Slop Sweep on the diff)
 ```
 
 Each mode is **mutually exclusive** — the full protocol lives in a per-mode reference file. Read ONLY the selected mode's file; that keeps this always-loaded body small (progressive disclosure). The skeleton below is the router, not the whole procedure — **load the mode file before acting.**
@@ -53,6 +57,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | `references/plan-mode.md` | P1–P6 plan reflexes + output template | PLAN MODE selected |
 | `references/build-mode.md` | Pre-flight 1a–1e (schema query, 1d worklist engine, 1e gate), Step 2 symbol-loss + re-seed, Step 3 audit (cross-layer index, 5 layers, R1–R5, report/verdict) | BUILD MODE selected — **read before writing code** |
 | `references/debug-mode.md` | 5-phase debug protocol + escalation | DEBUG MODE selected |
+| `references/cleanup-mode.md` | opt-in report-only dead/orphaned/redundant-code protocol: liveness-veto gate, framework FP-category gate, per-language detectors, redundancy counter-rule | CLEANUP MODE selected (explicit cleanup request only) |
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |
 | `references/audit-deep-checks.md` | Full-depth layer checks (DB, Logic, Efficiency, Security) + R1–R5 redundancy detectors in detail | any audit layer runs at full depth |
 | `references/design-rationale.md` | rule history + council-gate rationale | only when modifying this skill itself |
@@ -83,7 +88,7 @@ When unsure which row applies, take the deeper one.
 
 - **Step 1 — Pre-Flight (before code):** 1a Scope · 1b Schema Check (live DB introspection) · 1c Existing-Code & Duplicate-Resource scan · **1d Recursive Dependency Propagation** (QUEUE/VISITED/LEDGER worklist to fixpoint — the most critical step) · 1e **Blast-Radius Council Gate**.
 - **Step 2 — Post-Change Verification:** run the symbol-loss gate (`detect-symbol-loss.py`), re-seed the 1d worklist from the real diff, drain to fixpoint.
-- **Step 3 — Audit (ALWAYS runs; triage scales depth, never existence):** intensity triage → 5 layers (DB · Logic · Efficiency · Redundancy R1–R5 · Security) → report with VERIFIED command output → append `.audit-log.md`. Verification-not-assertion: dump the real payload/grep/endpoint, never "looks right".
+- **Step 3 — Audit (ALWAYS runs; triage scales depth, never existence):** intensity triage → 6 layers (DB · Logic · Efficiency · Redundancy R1–R5 · Security · Self-Slop Sweep [always-on, diff-only]) → report with VERIFIED command output → append `.audit-log.md`. Verification-not-assertion: dump the real payload/grep/endpoint, never "looks right".
 
 Full engine, schema query, cross-layer index, R1–R5 commands, report + verdict rules: `references/build-mode.md`.
 
@@ -103,6 +108,20 @@ Escalation: failed twice → convene `llm-council` unconditionally. Full protoco
 
 ---
 
+## CLEANUP MODE
+
+Explicit request to clean up / remove dead / orphaned / unused / redundant **existing** code (NOT the current task's own output — that is the always-on Self-Slop Sweep in BUILD MODE). **Read `references/cleanup-mode.md`** and run the report-only protocol:
+
+1. **Inventory** candidates with whatever per-language detectors are installed (knip/ts-prune · vulture/ruff · phpstan/psalm/shipmonk) — candidate lists, never verdicts.
+2. **Classify** every candidate via `detect-dead-code.py --liveness … --root <src> --exclude <manifests/docs>` into LIVE / ASSERTED-DEAD / VERIFIED-DEAD-PRIVATE under the liveness-veto law. Scan the source, not the answer key — exclude data manifests/changelogs that name symbols without calling them.
+3. **Cross-check** survivors against ALL file types (templates/config/JSON/SQL/i18n) — string-resolved references defeat static graphs.
+4. **Redundancy** via R2/R3/R5 with the Rule-of-Three guard (`--extract-threshold 3`); extract only same-knowledge ≥3-site clones, never build the wrong abstraction.
+5. **Report only.** Emit a classified report; the skill never deletes. The human decides every removal; if asked to act, one symbol per commit, git-recoverable, tests green, re-audited.
+
+Core invariant: **any single positive signal proves LIVE and vetoes removal; absence of references never proves dead.** Only closed-world (private / non-exported) symbols with 0 refs and no keep-alive flag can ever reach VERIFIED-DEAD-PRIVATE. Full protocol: `references/cleanup-mode.md`.
+
+---
+
 ## Self-Tuning
 
 When reading `.audit-log.md` at audit start:
@@ -116,4 +135,6 @@ When reading `.audit-log.md` at audit start:
 - **Live DB beats any static file.** No DB access → ask once; if unavailable, audit without the DB layer and mark "⚠️ DB unchecked".
 - **Output proportional to findings** — clean code gets one line; problems get detail.
 - **The council advises; commands verify.** LLM-council output is never a substitute for command-output proof.
+- **Never delete productive code; absence of references never proves dead.** Any single positive signal (a reference, a route/template/DI/DB-dispatch/config hit) vetoes removal. CLEANUP MODE is report-only; the Self-Slop Sweep removes only your own just-added, zero-reference diff code.
+- **Duplication is cheaper than the wrong abstraction.** Never extract a shared abstraction to kill duplication unless ≥3 sites (Rule of Three) AND they encode the same knowledge (one reason to change). Cleaning slop must not create slop.
 - Version history and gate rationale: `references/design-rationale.md` (load only when editing this skill).
