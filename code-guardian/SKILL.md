@@ -55,7 +55,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | File | Contents | Load when |
 |---|---|---|
 | `references/plan-mode.md` | P1–P6 plan reflexes + output template | PLAN MODE selected |
-| `references/build-mode.md` | Pre-flight 1a–1e (schema query, 1d worklist engine, 1e gate), Step 2 symbol-loss + re-seed, Step 3 audit (cross-layer index, 5 layers, R1–R5, report/verdict) | BUILD MODE selected — **read before writing code** |
+| `references/build-mode.md` | Pre-flight 1a–1e (schema query, 1d worklist engine, 1e gate), Step 2 symbol-loss + re-seed, Step 3 audit (cross-layer index, 6 layers, R1–R5, report/verdict) | BUILD MODE selected — **read before writing code** |
 | `references/debug-mode.md` | 5-phase debug protocol + escalation | DEBUG MODE selected |
 | `references/cleanup-mode.md` | opt-in report-only dead/orphaned/redundant-code protocol: liveness-veto gate, framework FP-category gate, per-language detectors, redundancy counter-rule | CLEANUP MODE selected (explicit cleanup request only) |
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |

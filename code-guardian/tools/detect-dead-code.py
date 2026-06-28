@@ -68,10 +68,6 @@ DEFAULT_EXCLUDE = (
 )
 
 
-def _default_exclude():
-    return re.compile(DEFAULT_EXCLUDE)
-
-
 # ----------------------------------------------------------------------
 # Symbol extraction — regex heads, dependency-free (verbatim from
 # detect-symbol-loss.py). Each pattern captures (name, params); class-like
@@ -276,7 +272,9 @@ def _is_private(def_line, name, ext):
         return True
     if ext == ".py" and re.search(r"\bdef\s+_\w", def_line):
         return True
-    if name.startswith("_"):
+    # A leading underscore only signals privacy in Python — in PHP/Ruby/Go/etc.
+    # `public function _normalize()` is perfectly callable from outside.
+    if ext == ".py" and name.startswith("_"):
         return True
     return False
 
@@ -337,6 +335,29 @@ RELATION_RE = re.compile(
 _ENTRYPOINT_NAME_RE = re.compile(r"(Job|Listener|Observer|Webhook|Command|Subscriber)$")
 _ENTRYPOINT_FILE_RE = re.compile(r"(Job|Listener|Observer|Webhook|Command|Subscriber)")
 
+# Constructed-name / reflective dispatch. A `private` method can only be reached
+# from inside its own class, so dispatch that resolves to it lives in the SAME
+# file — scanning the def file alone is enough to veto a VERIFIED verdict.
+DYNAMIC_MARKERS = (
+    "->{$", "::{$", "->$",          # PHP variable method / property access
+    "call_user_func", "call_user_func_array",
+    "ReflectionMethod", "ReflectionClass",
+    "__call", "__callStatic",       # PHP magic-method interception
+    "getattr(",                     # Python attribute dispatch
+)
+
+
+def _strip_comments_strings(text):
+    """Best-effort removal of string literals + // /* */ # comments so the
+    dynamic-dispatch marker scan sees CODE, not prose. Approximate, regex-based,
+    dependency-free — over-stripping is fine here (we only scan for markers)."""
+    text = re.sub(r'"(?:[^"\\]|\\.)*"', '""', text)
+    text = re.sub(r"'(?:[^'\\]|\\.)*'", "''", text)
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)   # block comments
+    text = re.sub(r"//[^\n]*", " ", text)                # // line comments
+    text = re.sub(r"#[^\n]*", " ", text)                 # # line comments (php/py/ruby)
+    return text
+
 
 def fp_flags_for(name, root, def_file, exclude_re):
     """Compute the set of framework keep-alive vetoes for `name`."""
@@ -360,9 +381,23 @@ def fp_flags_for(name, root, def_file, exclude_re):
             flags.add("entrypoint")
         dtext = read_file(os.path.join(os.path.abspath(root), def_file))
         if dtext:
+            # FIX 2 — constructed-name/reflective dispatch in the def file: a
+            # private method reachable this way is kept (never VERIFIED).
+            # Scan CODE only — strip comments + string literals first so a
+            # docblock mentioning `__call` or a string containing
+            # `call_user_func` does not spuriously fire the keep-alive.
+            if any(marker in _strip_comments_strings(dtext)
+                   for marker in DYNAMIC_MARKERS):
+                flags.add("dynamic")
             mdef = re.search(r"function\s+" + re.escape(name) + r"\s*\(", dtext)
-            if mdef and RELATION_RE.search(dtext[mdef.end():mdef.end() + 200]):
-                flags.add("magic")  # relation-like public method
+            if mdef:
+                body = dtext[mdef.end():mdef.end() + 200]
+                if RELATION_RE.search(body):
+                    flags.add("magic")  # relation-like public method
+                # FIX 3 — modern Laravel Attribute accessor (`: Attribute`
+                # return type or `Attribute::make(`) reached as a magic prop.
+                if ": Attribute" in body or "Attribute::make(" in body:
+                    flags.add("magic")
 
     # template forms for blade_vue
     kebab = _kebab(name)
@@ -376,6 +411,7 @@ def fp_flags_for(name, root, def_file, exclude_re):
 
     refs_tests = 0
     refs_other = 0
+    def_sites = 0
     for full, rel in _iter_text_files(root, exclude_re):
         text = read_file(full)
         if text is None:
@@ -386,6 +422,8 @@ def fp_flags_for(name, root, def_file, exclude_re):
         positions = [m.start() for m in word.finditer(text)]
         if not positions:
             continue
+        dpos = _def_positions(text, name)
+        def_sites += len(dpos)
         # route
         if low.startswith("routes/") or "/routes/" in "/" + low:
             flags.add("route")
@@ -405,7 +443,7 @@ def fp_flags_for(name, root, def_file, exclude_re):
                 or rel.endswith(".sql"):
             flags.add("db_dispatch")
         # test_only ref accounting (non-definition occurrences)
-        nondef = len(positions) - len(_def_positions(text, name))
+        nondef = len(positions) - len(dpos)
         if nondef > 0:
             if _under_tests(rel):
                 refs_tests += nondef
@@ -414,6 +452,11 @@ def fp_flags_for(name, root, def_file, exclude_re):
 
     if refs_tests > 0 and refs_other == 0:
         flags.add("test_only")
+    # FIX 5 — more than one definition site of `name`: the reported privacy is
+    # filesystem-order-dependent, so refuse to VERIFY (a public twin could hide
+    # behind a private one). Keep, flag as ambiguous.
+    if def_sites > 1:
+        flags.add("ambiguous")
     return flags
 
 
@@ -434,7 +477,7 @@ def classify_symbol(name, refs, fp_flags, is_private):
 # ----------------------------------------------------------------------
 # --diff-slop: own unused additions + debug leftovers
 # ----------------------------------------------------------------------
-def _slop_entrypoint(name, def_file, def_line):
+def _slop_entrypoint(name, def_file, def_line, file_text=""):
     """True if an added symbol looks like an intended entry point => REVIEW,
     not REMOVABLE."""
     dfl = (def_file or "").lower()
@@ -455,6 +498,12 @@ def _slop_entrypoint(name, def_file, def_line):
         return True
     if re.search(r"\bexport\b", def_line):
         return True
+    # FIX 7 — Python entry points: a bare `main` function, or any addition in a
+    # file guarded by `if __name__ == "__main__"`, is run, not dead.
+    if name == "main":
+        return True
+    if file_text and re.search(r"__name__\s*==\s*['\"]__main__['\"]", file_text):
+        return True
     return False
 
 
@@ -464,8 +513,10 @@ DEBUG_PATTERNS = [
     ("dump", re.compile(r"\bdump\s*\(")),
     ("console.log", re.compile(r"console\s*\.\s*log\s*\(")),
     ("print_r", re.compile(r"\bprint_r\s*\(")),
-    ("print", re.compile(r"\bprint\s*\(")),
-    ("marker", re.compile(r"\b(TODO|FIXME|XXX|PLACEHOLDER)\b|\bexample\b", re.I)),
+    # NB: bare `print(` is normal Python/PHP output — not a debug leftover —
+    # and `\bexample\b` hits noreply@example.com / example.org. Both removed so
+    # the REMOVE path never strips live config/output.
+    ("marker", re.compile(r"\b(TODO|FIXME|XXX|PLACEHOLDER)\b", re.I)),
 ]
 
 
@@ -541,7 +592,7 @@ def run_diff_slop(ref, paths, exclude_re):
                 live_added.append((path, name))
                 continue
             def_line = _find_def_line(after, name)
-            if _slop_entrypoint(name, path, def_line):
+            if _slop_entrypoint(name, path, def_line, after):
                 review.append((path, name))
             else:
                 removable.append((path, name))
@@ -558,10 +609,10 @@ def run_diff_slop(ref, paths, exclude_re):
 # ----------------------------------------------------------------------
 def report_liveness(rows):
     live = asserted = verified = 0
-    for name, cls, refs, fp, priv in rows:
+    for name, cls, refs, fp, priv, def_file in rows:
         fpstr = ",".join(sorted(fp)) if fp else "-"
-        print("%s  class=%s  refs=%d  fp=%s  private=%s"
-              % (name, cls, refs, fpstr, "y" if priv else "n"))
+        print("%s  class=%s  refs=%d  fp=%s  private=%s  def=%s"
+              % (name, cls, refs, fpstr, "y" if priv else "n", def_file or "?"))
         if cls == "LIVE":
             live += 1
         elif cls == "VERIFIED-DEAD-PRIVATE":
@@ -585,7 +636,7 @@ def run_liveness(names, root, exclude_re):
         def_file, is_priv, _line = find_definition(name, root, exclude_re)
         fp = fp_flags_for(name, root, def_file, exclude_re)
         cls = classify_symbol(name, refs, fp, is_priv)
-        rows.append((name, cls, refs, fp, is_priv))
+        rows.append((name, cls, refs, fp, is_priv, def_file))
     return report_liveness(rows)
 
 
