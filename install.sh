@@ -16,6 +16,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="${SCRIPT_DIR}/code-guardian"
 TARGET_ROOT="${HOME}/.claude/skills"
 TARGET_DIR="${TARGET_ROOT}/code-guardian"
+# Bundled companion skill — powers the Council Gates that code-guardian invokes
+# (DEBUG Phase 3, two-failure Escalation, BUILD Pre-Flight 1e Blast-Radius).
+COUNCIL_SOURCE_DIR="${SCRIPT_DIR}/llm-council"
+COUNCIL_TARGET_DIR="${TARGET_ROOT}/llm-council"
 # Backups live OUTSIDE the skills root — a backup placed under skills/ is
 # auto-discovered by Claude Code as a duplicate skill (it has a SKILL.md).
 BACKUP_ROOT="${HOME}/.claude/skill-backups"
@@ -50,9 +54,11 @@ die()  { printf '\033[0;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
 for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh detect-symbol-loss.py detect-dead-code.py; do
     [ -f "$SOURCE_DIR/tools/$tool" ] || die "Helper script missing: $SOURCE_DIR/tools/$tool"
 done
+[ -f "$COUNCIL_SOURCE_DIR/SKILL.md" ] || die "Bundled companion missing: $COUNCIL_SOURCE_DIR/SKILL.md"
 
 log "Source:  $SOURCE_DIR"
 log "Target:  $TARGET_DIR"
+log "Companion: $COUNCIL_SOURCE_DIR -> $COUNCIL_TARGET_DIR"
 
 # Create parent directory if needed
 if [ ! -d "$TARGET_ROOT" ]; then
@@ -120,13 +126,34 @@ if [ "$DRY_RUN" -eq 0 ]; then
     else
         warn "Missing markers: ${missing[*]} — installed version may be outdated"
     fi
+fi
 
-    # llm-council skill is an optional but recommended companion (v7 Council Gate)
-    if [ -d "${HOME}/.claude/skills/llm-council" ] || [ -L "${HOME}/.claude/skills/llm-council" ]; then
-        ok "Companion skill detected: llm-council (v7 Council Gate is operational)"
+# Companion skill: llm-council (bundled). code-guardian invokes it at three judgment
+# points, so it now ships with this repo and installs alongside the skill.
+# Install-only-if-missing: an existing (possibly customized) council is left untouched
+# unless --force is passed, which overwrites it with the bundled copy.
+log "Companion skill: llm-council"
+council_exists=0
+{ [ -d "$COUNCIL_TARGET_DIR" ] || [ -L "$COUNCIL_TARGET_DIR" ]; } && council_exists=1
+
+if [ "$council_exists" -eq 1 ] && [ "$FORCE" -eq 0 ]; then
+    ok "llm-council already present — leaving as-is (use --force to overwrite)"
+else
+    if [ "$council_exists" -eq 1 ]; then
+        warn "Existing llm-council found — --force was passed, overwriting with bundled copy"
     else
-        warn "Companion skill 'llm-council' not installed — v7 Council Gate will be skipped at runtime"
-        warn "Install llm-council into ~/.claude/skills/llm-council to enable Phase 3 + Escalation council triggers"
+        log "No llm-council found — installing bundled copy"
+    fi
+    if [ "$DRY_RUN" -eq 0 ]; then
+        rm -rf "$COUNCIL_TARGET_DIR"
+        cp -R "$COUNCIL_SOURCE_DIR" "$COUNCIL_TARGET_DIR"
+        if grep -q "name: llm-council" "$COUNCIL_TARGET_DIR/SKILL.md" 2>/dev/null; then
+            ok "llm-council installed -> $COUNCIL_TARGET_DIR (Council Gates operational out of the box)"
+        else
+            die "llm-council verification failed: marker 'name: llm-council' not found in $COUNCIL_TARGET_DIR/SKILL.md"
+        fi
+    else
+        ok "llm-council would be installed -> $COUNCIL_TARGET_DIR (dry-run)"
     fi
 fi
 

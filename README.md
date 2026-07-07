@@ -81,21 +81,23 @@ The new helper `tools/detect-dead-code.py` is a dependency-free, report-only liv
 .
 ├── install.sh                     ← automated installer (macOS + Linux)
 ├── README.md                      ← this file
-└── code-guardian/
-    ├── SKILL.md                   ← the skill definition (~1110 lines)
-    └── tools/
-        ├── detect-secrets.sh      ← R1 hardcoded-secret scanner
-        ├── detect-clones.py       ← R2/R3/R5 cross-file clone detector (Rule-of-Three guard)
-        ├── detect-config-leaks.sh ← R4 env()/getenv() leakage scanner
-        ├── detect-symbol-loss.py  ← post-change silent-symbol-loss gate
-        └── detect-dead-code.py    ← v11 report-only liveness aggregator (Self-Slop + CLEANUP MODE)
+├── code-guardian/
+│   ├── SKILL.md                   ← the skill definition (~1110 lines)
+│   └── tools/
+│       ├── detect-secrets.sh      ← R1 hardcoded-secret scanner
+│       ├── detect-clones.py       ← R2/R3/R5 cross-file clone detector (Rule-of-Three guard)
+│       ├── detect-config-leaks.sh ← R4 env()/getenv() leakage scanner
+│       ├── detect-symbol-loss.py  ← post-change silent-symbol-loss gate
+│       └── detect-dead-code.py    ← v11 report-only liveness aggregator (Self-Slop + CLEANUP MODE)
+└── llm-council/
+    └── SKILL.md                   ← bundled companion — powers the Council Gates
 ```
 
 ---
 
 ## Installation
 
-**Prerequisite:** Claude Code installed on the target machine. The [`llm-council`](https://github.com/) skill is a recommended companion — the v7 Council Gate is skipped silently if it is absent.
+**Prerequisite:** Claude Code installed on the target machine. The `llm-council` companion skill is **bundled** in this repo and installed automatically, so the Council Gates work out of the box — no separate download. If you already have your own `llm-council`, the installer leaves it untouched (see below).
 
 ```bash
 git clone https://github.com/provimedia/codeguard.git
@@ -110,7 +112,7 @@ The installer will:
 - Copy `SKILL.md` and `tools/` into `~/.claude/skills/code-guardian/`
 - Set executable bits on the helper scripts
 - Verify that v5 + v6 + v7 + v7.1 markers are present
-- Warn if the companion `llm-council` skill is missing
+- Install the bundled `llm-council` companion into `~/.claude/skills/llm-council/` **only if it is not already present** (an existing council is left untouched unless `--force` is passed)
 - Print next steps
 
 ### Installer options
@@ -175,7 +177,7 @@ Code Guardian is designed to **compose** with Anthropic's superpowers skills, no
 | `superpowers:writing-plans`               | PLAN MODE reviews the final plan before dispatch            |
 | `superpowers:subagent-driven-development` | BUILD MODE runs in each subagent's post-impl audit          |
 | `superpowers:systematic-debugging`        | DEBUG MODE drives the hypothesis-verification loop          |
-| `llm-council` (companion)                 | DEBUG Phase 3 Council Gate + Escalation council             |
+| `llm-council` (bundled companion)         | DEBUG Phase 3 Council Gate + Escalation council + BUILD 1e  |
 
 Run both systems at the same time — they reinforce each other. When they conflict, user instructions always win.
 
