@@ -15,13 +15,15 @@ description: >
   "implement", "aendere", "fuege hinzu", "fixe", "baue", "erstelle", "implementiere".
   Use when (opt-in CLEANUP MODE): "clean up", "räum auf", "aufräumen", "dead code", "toten Code",
   "unused", "ungenutzt", "orphan", "verwaist", "redundant", "remove duplicates" — report-only, never deletes productive code.
+  Use when (DECISION GATE): about to present the user ANY option question (A/B/C, variant 1/2/3,
+  "which approach?") — a recommendation is mandatory first; the gate recommends, the user decides.
   ANTI-RATIONALIZATION: If you think "this is too small to need an audit" — that IS the trigger.
   If you think "I already understand this" — that IS the trigger.
   If you think "the user is waiting, just do it quickly" — that IS the trigger.
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v11)
+# Code Guardian (v12)
 
 ## Operating Principles
 
@@ -48,6 +50,8 @@ Task received
 
 Each mode is **mutually exclusive** — the full protocol lives in a per-mode reference file. Read ONLY the selected mode's file; that keeps this always-loaded body small (progressive disclosure). The skeleton below is the router, not the whole procedure — **load the mode file before acting.**
 
+The **DECISION GATE** is orthogonal to mode selection: it fires in ANY mode (and outside them) the moment an option question is about to go to the user.
+
 ## Reference Files (progressive disclosure)
 
 The full catalog lives in `references/` next to this file. Load with the Read tool when the rule says so — not preemptively. Reference files cost zero tokens until read.
@@ -58,6 +62,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | `references/build-mode.md` | Pre-flight 1a–1e (schema query, 1d worklist engine, 1e gate), Step 2 symbol-loss + re-seed, Step 3 audit (cross-layer index, 6 layers, R1–R5, report/verdict) | BUILD MODE selected — **read before writing code** |
 | `references/debug-mode.md` | 5-phase debug protocol + escalation | DEBUG MODE selected |
 | `references/cleanup-mode.md` | opt-in report-only dead/orphaned/redundant-code protocol: liveness-veto gate, framework FP-category gate, per-language detectors, redundancy counter-rule | CLEANUP MODE selected (explicit cleanup request only) |
+| `references/decision-gate.md` | T1 rubric matrix, T2 advocate / T3 council escalation triggers, binding "(Empfohlen)" output template | DECISION GATE fires (an option question is about to go to the user) |
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |
 | `references/audit-deep-checks.md` | Full-depth layer checks (DB, Logic, Efficiency, Security) + R1–R5 redundancy detectors in detail | any audit layer runs at full depth |
 | `references/design-rationale.md` | rule history + council-gate rationale | only when modifying this skill itself |
@@ -122,6 +127,20 @@ Core invariant: **any single positive signal proves LIVE and vetoes removal; abs
 
 ---
 
+## DECISION GATE
+
+About to present the user an option question (A/B/C, variant 1/2/3, "which approach?", any `AskUserQuestion`) → **Read `references/decision-gate.md`** and run the gate BEFORE asking. No option question leaves without a recommendation; the gate never creates questions that need not be asked.
+
+- **T1 Rubric (always):** score options on Longevity/Maintainability · Architectural cleanliness · Reversibility/Lock-in · Follow-up cost · Best-practice conformity. Tie-break: **long-term beats short-term**.
+- **T2 Advocates (⚡):** options materially diverge AND no clear T1 winner → one parallel advocate subagent per option.
+- **T3 Council:** hard-to-reverse OR ≥ 5 consumers OR foundation decision (schema/auth/payment/framework) → convene `llm-council` (bundled).
+- **Output (binding):** recommended option FIRST, label suffixed "(Empfohlen)" / "(Recommended)", + 1–2 sentence rubric justification; every other option fair, with its honest trade-off.
+- **The gate recommends; the user decides.** Autonomous deciding is forbidden — and the gate advises, it never verifies.
+
+Full rubric, escalation triggers, council framing, output template: `references/decision-gate.md`.
+
+---
+
 ## Self-Tuning
 
 When reading `.audit-log.md` at audit start:
@@ -137,4 +156,5 @@ When reading `.audit-log.md` at audit start:
 - **The council advises; commands verify.** LLM-council output is never a substitute for command-output proof.
 - **Never delete productive code; absence of references never proves dead.** Any single positive signal (a reference, a route/template/DI/DB-dispatch/config hit) vetoes removal. CLEANUP MODE is report-only; the Self-Slop Sweep removes only your own just-added, zero-reference diff code.
 - **Duplication is cheaper than the wrong abstraction.** Never extract a shared abstraction to kill duplication unless ≥3 sites (Rule of Three) AND they encode the same knowledge (one reason to change). Cleaning slop must not create slop.
+- **The gate recommends; the user decides.** No option question to the user without a "(Empfohlen)" recommendation (DECISION GATE) — and never decide autonomously what the user reserved for themselves.
 - Version history and gate rationale: `references/design-rationale.md` (load only when editing this skill).

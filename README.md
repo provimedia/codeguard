@@ -2,7 +2,7 @@
 
 A mandatory audit skill for [Claude Code](https://claude.com/claude-code) that prevents bugs by enforcing plan-time, build-time, and debug-time reflexes. Born from real bugs that escaped audits in production — every rule is backed by a concrete incident citation in `SKILL.md`.
 
-- **Version:** v7.1 (Council Edition)
+- **Version:** v12 (Decision Gate Edition)
 - **Platform:** macOS / Linux
 - **Languages:** English + German trigger phrases
 
@@ -72,6 +72,18 @@ Two safety-separated capabilities for keeping the codebase clean — split by ri
 The governing law: **any single positive signal (a reference, a route/template/DI/DB-dispatch/config hit) proves LIVE and vetoes removal; absence of references never proves dead.** Only closed-world symbols (PHP `private`, Python `_name`, non-exported JS/TS) with zero references and no framework keep-alive flag can ever reach VERIFIED-DEAD-PRIVATE — and even then the skill only *recommends*; the human deletes. Validated against a 30-trap adversarial fixture in `test/`: **0 productive-code symbols flagged deletable (CRITICAL_FP=0)**.
 
 The new helper `tools/detect-dead-code.py` is a dependency-free, report-only liveness-evidence aggregator — it classifies, it never mutates a source file.
+
+### Decision Gate (v12)
+
+Orthogonal to all modes: whenever the agent is about to present the user an **option question** (A/B/C, variant 1/2/3, "which approach?", any `AskUserQuestion`), the DECISION GATE fires first. **No option question without a recommendation — and the gate never decides autonomously**; the final call always stays with the user.
+
+| Tier | Fires when | Process |
+|------|------------|---------|
+| T1 Rubric | always | score options on Longevity/Maintainability · Architectural cleanliness · Reversibility/Lock-in · Follow-up cost · Best-practice conformity; tie-break: **long-term beats short-term** |
+| T2 Advocates ⚡ | materially divergent options, no clear T1 winner | one parallel advocate subagent per option |
+| T3 Council | hard-to-reverse OR ≥ 5 consumers OR foundation decision (schema/auth/payment/framework) | bundled `llm-council`, Chairman verdict feeds the recommendation |
+
+Binding output: recommended option **first**, label suffixed "(Empfohlen)" / "(Recommended)", 1–2 sentence rubric justification, all other options presented fairly with their honest trade-off. Full protocol: `code-guardian/references/decision-gate.md`. Optional deterministic enforcement via a `PreToolUse` hook — see "Recommended Companion Settings".
 
 ---
 
@@ -203,10 +215,42 @@ Add to `~/.claude/settings.json` to fire an audit reminder after every `Write` /
 
 Optional — the skill self-activates via its frontmatter triggers regardless.
 
+### Decision Gate enforcement hook (v12, optional but recommended)
+
+Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denies** any `AskUserQuestion` call whose options carry no "(Empfohlen)" / "(Recommended)" marker. The deny reason is fed back to the model (doc-backed: PreToolUse stdout is not visible to the model, `permissionDecisionReason` is), which re-runs the gate and re-issues the question with a recommendation — a self-correcting loop.
+
+Save as `~/.claude/hooks/decision-gate-check.sh` (`chmod +x`), requires `jq`:
+
+```bash
+#!/bin/bash
+INPUT=$(cat)
+LABELS=$(echo "$INPUT" | jq -r '[.tool_input.questions[]?.options[]?.label // empty] | join("\n")' 2>/dev/null)
+QUESTIONS=$(echo "$INPUT" | jq -r '[.tool_input.questions[]?.question // empty] | join("\n")' 2>/dev/null)
+echo "$LABELS"    | grep -qiE '\((Empfohlen|Recommended)\)' && exit 0
+echo "$QUESTIONS" | grep -qi  'keine-empfehlung\|no-recommendation' && exit 0
+cat <<'EOF'
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"DECISION GATE (code-guardian v12): option question without a recommendation. Run references/decision-gate.md first (T1 rubric, T2/T3 if triggered), then re-issue the question with the recommended option FIRST, label suffixed ' (Empfohlen)'/' (Recommended)', plus a 1-2 sentence rubric justification. The gate recommends; the user decides. Exception for pure-preference questions: append '[keine-empfehlung: <reason>]' to the question text."}}
+EOF
+```
+
+Register in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "AskUserQuestion",
+      "hooks": [{ "type": "command", "command": "~/.claude/hooks/decision-gate-check.sh" }]
+    }]
+  }
+}
+```
+
 ---
 
 ## Version History
 
+- **v12** (2026-07) — Decision Gate. Orthogonal gate that fires before ANY option question to the user: tiered max-think (T1 rubric always · T2 parallel advocates on material divergence · T3 bundled `llm-council` on irreversible/≥5-consumer/foundation decisions), binding "(Empfohlen)"-first output format, explicit prohibition of autonomous deciding — the gate recommends, the user decides. New `references/decision-gate.md`; optional deterministic `PreToolUse` hook on `AskUserQuestion` (denies unrecommended option questions; deny reason self-corrects the model). `llm-council` companion now bundled in-repo and auto-installed by `install.sh` (install-only-if-missing).
 - **v11** (2026-06) — Cleanup & Anti-Slop. Always-on **Self-Slop Sweep** (BUILD audit Layer 6, diff-only) strips the agent's own AI-slop; opt-in **CLEANUP MODE** (report-only) classifies pre-existing dead/orphaned/redundant code (LIVE / ASSERTED-DEAD / VERIFIED-DEAD-PRIVATE) under a liveness-veto gate and never deletes productive code. New `tools/detect-dead-code.py` (report-only liveness aggregator) + Rule-of-Three guard in `detect-clones.py`. Validated against a 30-trap adversarial fixture (`test/`): CRITICAL_FP=0. *(Note: this history skips v8–v10.1, documented in `code-guardian/references/design-rationale.md`; the sections above still describe v7.1 and predate them.)*
 - **v7.1** (2026-05) — Blast-Radius Council Gate added to BUILD MODE Pre-Flight (step 1e). Proactive analog of DEBUG Phase 3's reactive gate. Strictly AND-of-4 gated (≥ 5 consumers + non-additive change + sparse test coverage + non-trivial reversal) to avoid council fatigue on routine pre-flights. Catches architectural divergence at build-time, orders of magnitude cheaper than catching it after a regression ships.
 - **v7** (2026-05) — LLM Council integration. Council Gate in DEBUG Phase 3 (gated, 4 conditions) and unconditional council in Escalation after two failed root-cause fixes. Council is a decision aid, not a verification substitute. Heavy expansion of Cross-Layer Checks (auth parity, session lifecycle, HTTP cacheability, log hygiene, CRLF injection, CSRF-on-GET, index coercion, charset drift, deep-offset pagination, cache invalidation coverage, TOCTOU / idempotency, SSRF). Security reflex covers JWT `alg=none`, unserialize / LFI / command-injection / XXE sinks, rate-limit key scope, IPv6 /64 masking.

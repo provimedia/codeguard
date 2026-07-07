@@ -108,21 +108,22 @@ if [ "$DRY_RUN" -eq 0 ]; then
     fi
 fi
 
-# Version check — confirm v11 structural markers + shipped features are present
+# Version check — confirm v12 structural markers + shipped features are present
 if [ "$DRY_RUN" -eq 0 ]; then
     missing=()
-    grep -q "Code Guardian (v11)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v11)")
+    grep -q "Code Guardian (v12)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v12)")
     grep -q "PLAN MODE"                        "$TARGET_DIR/SKILL.md" || missing+=("PLAN MODE")
     grep -q "BUILD MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("BUILD MODE")
     grep -q "DEBUG MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("DEBUG MODE")
     grep -q "CLEANUP MODE"                     "$TARGET_DIR/SKILL.md" || missing+=("CLEANUP MODE")
+    grep -q "DECISION GATE"                    "$TARGET_DIR/SKILL.md" || missing+=("DECISION GATE")
     grep -q "Self-Slop Sweep"                  "$TARGET_DIR/SKILL.md" || missing+=("Self-Slop Sweep")
     grep -q "Blast-Radius Council Gate"        "$TARGET_DIR/SKILL.md" || missing+=("Blast-Radius Council Gate")
     grep -q "detect-symbol-loss.py"            "$TARGET_DIR/SKILL.md" || missing+=("symbol-loss gate (SKILL.md)")
     [ -f "$TARGET_DIR/tools/detect-symbol-loss.py" ] || missing+=("tools/detect-symbol-loss.py")
     [ -f "$TARGET_DIR/tools/detect-dead-code.py" ] || missing+=("tools/detect-dead-code.py")
     if [ ${#missing[@]} -eq 0 ]; then
-        ok "v11 markers + symbol-loss + dead-code gates detected in installed skill"
+        ok "v12 markers + symbol-loss + dead-code + decision gates detected in installed skill"
     else
         warn "Missing markers: ${missing[*]} — installed version may be outdated"
     fi
