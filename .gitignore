@@ -7,3 +7,4 @@ evolution/
 run-iteration.md
 deploy.sh
 readme.txt
+__pycache__/
