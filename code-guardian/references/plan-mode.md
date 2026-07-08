@@ -2,7 +2,7 @@
 
 > Loaded when a spec/plan exists. The router lives in `SKILL.md`; this file holds the full reflex text. Operating Principles (in SKILL.md) govern every reflex below.
 
-Bugs that survive the audit usually originated in the plan. Run these 6 reflexes against any spec/plan before implementation is dispatched — and again when receiving a plan from another author. Run them, record PASS/FAIL with proof, move on (Principle 2).
+Bugs that survive the audit usually originated in the plan. Run these 7 reflexes against any spec/plan before implementation is dispatched — and again when receiving a plan from another author. Run them, record PASS/FAIL with proof, move on (Principle 2).
 
 **P1. Cross-Layer Trace for Every New Field.** Walk each new field end-to-end: DB column → model allowlist/visibility → serializer/response builder → transport payload → client template. A model-layer allowlist does NOT guarantee client delivery — if the serializer uses an explicit key whitelist, an absent field is dropped silently. *Check:* grep the response builders for explicit key lists; if any exist, the plan must include the serializer change.
 
@@ -16,6 +16,8 @@ Bugs that survive the audit usually originated in the plan. Run these 6 reflexes
 
 **P6. WIP Staging Discipline for Subagent Briefings.** On a branch with pre-existing uncommitted WIP, subagent prompts must mandate hunk-level staging: `git add <new-file>` or `git add -p <existing-file>` — never `git add .`/`-A`/bare `git add <existing-file>` (sweeps ALL hunks in the file). Fix the briefing template, not the symptom; by audit-time the commit already exists.
 
+**P7. Generalization — examples are data, never code.** When the requirement quantifies universally ("every industry", "any domain", "für jede Branche") and names example values (a domain, a date, an ID), the plan MUST name the **generic mechanism** (classifier, parser, DB/config lookup, AI analysis) and route every example value into test data or config — never into `if`/`switch`/regex/lookup control flow. A plan that enumerates the examples as cases is the overfitting anti-pattern locked in at plan-time. Genuine single-value business rules must be declared as `INTENTIONAL-SPECIAL-CASE` with the business source. *Check:* grep the plan for each example literal; every hit must be in a test/config/seed section, not in described branching logic. Full law + deletion/second-example tests: `references/generalization-gate.md`.
+
 **Output** — append to the plan document:
 
 ```markdown
@@ -26,6 +28,7 @@ P3 Secrets Hygiene: PASS/FAIL — Verified-by: <grep for ?key=>
 P4 Cached-Config Safety: PASS/FAIL — Verified-by: <grep for raw env reads>
 P5 Pattern Source Quality: PASS/FAIL — Verified-by: <audit of referenced file>
 P6 WIP Staging Discipline: PASS/FAIL — Verified-by: <briefing template check>
+P7 Generalization: PASS/FAIL — Verified-by: <example-literal grep: hits only in test/config sections>
 ```
 
-Any FAIL → the plan is **BLOCKED** until its author updates it. No subagent dispatch before all six PASS.
+Any FAIL → the plan is **BLOCKED** until its author updates it. No subagent dispatch before all seven PASS.

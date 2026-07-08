@@ -1,8 +1,8 @@
-# Code Guardian v12 — Update-Anleitung
+# Code Guardian v13 — Update-Anleitung
 
-Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v12**,
+Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v13**,
 installiert den gebündelten **llm-council**-Companion mit und richtet die
-**Hooks jetzt automatisch** ein — inklusive des neuen DECISION GATE.
+**Hooks automatisch** ein — inklusive des DECISION GATE.
 
 ## Was ist neu seit v10
 
@@ -30,10 +30,26 @@ installiert den gebündelten **llm-council**-Companion mit und richtet die
   (nur wenn noch keiner vorhanden ist — ein eigener/angepasster Council wird
   nie überschrieben).
 
+### v13 — Generalization Gate (Anti-Hardcoding)
+
+- **Beispiele aus der Anforderung sind DATEN, niemals CODE:** Wenn die
+  Anforderung universell ist („für jede Branche") und Beispielwerte nennt
+  (domain1.de, ein Datum), darf keiner davon als `if`/`switch`/Regex/
+  Lookup-Konstante enden — Claude muss den generischen Mechanismus bauen
+  (Klassifikator/Parser/DB/KI-Analyse). Zwei Pflicht-Tests: Löschtest und
+  Zweitbeispiel-Test.
+- **Neues Tool `detect-hardcoded-cases.py`** (report-only): findet Domains/
+  URLs/E-Mails/Datumswerte (+ per `--examples` übergebene Werte) in
+  Entscheidungs-Kontexten; Config-/Test-/Fixture-Dateien sind ausgenommen.
+- **Ehrliche Ausnahme:** echte Einzelfall-Geschäftsregeln brauchen den Marker
+  `INTENTIONAL-SPECIAL-CASE: <Grund>` — sichtbar statt eingeschmuggelt.
+- Verdrahtet in PLAN MODE (neuer Reflex P7), BUILD-Audit (Logic-Layer) und
+  den always-on Self-Slop Sweep (diff-only).
+
 ## Schritt 1 — Installieren (EIN Befehl, macht alles)
 
 ```bash
-unzip code-guardian-v12-update.zip -d code-guardian-v12 && cd code-guardian-v12
+unzip code-guardian-v13-update.zip -d code-guardian-v13 && cd code-guardian-v13
 ./install.sh
 ```
 
@@ -73,9 +89,9 @@ Unter `/hooks` müssen erscheinen:
 ## Schritt 3 — Verifizieren
 
 ```bash
-grep -m1 "Code Guardian (v12)" ~/.claude/skills/code-guardian/SKILL.md   # → Treffer
-ls ~/.claude/skills/code-guardian/references/   # → 8 .md-Dateien (inkl. decision-gate.md, cleanup-mode.md)
-ls ~/.claude/skills/code-guardian/tools/        # → 5 Skripte (inkl. detect-dead-code.py)
+grep -m1 "Code Guardian (v13)" ~/.claude/skills/code-guardian/SKILL.md   # → Treffer
+ls ~/.claude/skills/code-guardian/references/   # → 9 .md-Dateien (inkl. generalization-gate.md, decision-gate.md)
+ls ~/.claude/skills/code-guardian/tools/        # → 6 Skripte (inkl. detect-hardcoded-cases.py)
 ls ~/.claude/skills/llm-council/SKILL.md        # → vorhanden
 ls -l ~/.claude/hooks/decision-gate-check.sh    # → -rwxr-xr-x
 
@@ -84,8 +100,8 @@ echo '{"tool_input":{"questions":[{"question":"A oder B?","options":[{"label":"A
   | ~/.claude/hooks/decision-gate-check.sh
 ```
 
-Der Installer prüft die v12-Marker selbst und meldet
-`v12 markers + symbol-loss + dead-code + decision gates detected`.
+Der Installer prüft die v13-Marker selbst und meldet
+`v13 markers + symbol-loss + dead-code + decision + generalization gates detected`.
 
 ## Voraussetzungen
 

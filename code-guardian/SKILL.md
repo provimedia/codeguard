@@ -23,7 +23,7 @@ description: >
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v12)
+# Code Guardian (v13)
 
 ## Operating Principles
 
@@ -63,6 +63,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | `references/debug-mode.md` | 5-phase debug protocol + escalation | DEBUG MODE selected |
 | `references/cleanup-mode.md` | opt-in report-only dead/orphaned/redundant-code protocol: liveness-veto gate, framework FP-category gate, per-language detectors, redundancy counter-rule | CLEANUP MODE selected (explicit cleanup request only) |
 | `references/decision-gate.md` | T1 rubric matrix, T2 advocate / T3 council escalation triggers, binding "(Empfohlen)" output template | DECISION GATE fires (an option question is about to go to the user) |
+| `references/generalization-gate.md` | the examples-are-data law, deletion + second-example tests, `detect-hardcoded-cases.py` usage, INTENTIONAL-SPECIAL-CASE marker | PLAN P7 runs, or the audit/Self-Slop flags a hardcoded example |
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |
 | `references/audit-deep-checks.md` | Full-depth layer checks (DB, Logic, Efficiency, Security) + R1–R5 redundancy detectors in detail | any audit layer runs at full depth |
 | `references/design-rationale.md` | rule history + council-gate rationale | only when modifying this skill itself |
@@ -71,11 +72,11 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 
 ## PLAN MODE
 
-Spec/plan exists → **Read `references/plan-mode.md`** and run the 6 plan reflexes against the plan/spec (and again when receiving a plan from another author):
+Spec/plan exists → **Read `references/plan-mode.md`** and run the 7 plan reflexes against the plan/spec (and again when receiving a plan from another author):
 
-P1 Cross-Layer Trace · P2 Scale Verification · P3 Secrets Hygiene · P4 Cached-Config Safety · P5 Pattern Source Quality · P6 WIP Staging Discipline.
+P1 Cross-Layer Trace · P2 Scale Verification · P3 Secrets Hygiene · P4 Cached-Config Safety · P5 Pattern Source Quality · P6 WIP Staging Discipline · P7 Generalization (examples are data, never code — the plan names the generic mechanism).
 
-Record each PASS/FAIL with command-output proof. Any FAIL → the plan is **BLOCKED** until its author fixes it; no subagent dispatch before all six PASS. Full reflex text + output template: `references/plan-mode.md`.
+Record each PASS/FAIL with command-output proof. Any FAIL → the plan is **BLOCKED** until its author fixes it; no subagent dispatch before all seven PASS. Full reflex text + output template: `references/plan-mode.md`.
 
 ---
 
@@ -93,7 +94,7 @@ When unsure which row applies, take the deeper one.
 
 - **Step 1 — Pre-Flight (before code):** 1a Scope · 1b Schema Check (live DB introspection) · 1c Existing-Code & Duplicate-Resource scan · **1d Recursive Dependency Propagation** (QUEUE/VISITED/LEDGER worklist to fixpoint — the most critical step) · 1e **Blast-Radius Council Gate**.
 - **Step 2 — Post-Change Verification:** run the symbol-loss gate (`detect-symbol-loss.py`), re-seed the 1d worklist from the real diff, drain to fixpoint.
-- **Step 3 — Audit (ALWAYS runs; triage scales depth, never existence):** intensity triage → 6 layers (DB · Logic · Efficiency · Redundancy R1–R5 · Security · Self-Slop Sweep [always-on, diff-only]) → report with VERIFIED command output → append `.audit-log.md`. Verification-not-assertion: dump the real payload/grep/endpoint, never "looks right".
+- **Step 3 — Audit (ALWAYS runs; triage scales depth, never existence):** intensity triage → 6 layers (DB · Logic [incl. Generalization: no example-literal in control flow] · Efficiency · Redundancy R1–R5 · Security · Self-Slop Sweep [always-on, diff-only, incl. `detect-hardcoded-cases.py --git`]) → report with VERIFIED command output → append `.audit-log.md`. Verification-not-assertion: dump the real payload/grep/endpoint, never "looks right".
 
 Full engine, schema query, cross-layer index, R1–R5 commands, report + verdict rules: `references/build-mode.md`.
 
@@ -157,4 +158,5 @@ When reading `.audit-log.md` at audit start:
 - **Never delete productive code; absence of references never proves dead.** Any single positive signal (a reference, a route/template/DI/DB-dispatch/config hit) vetoes removal. CLEANUP MODE is report-only; the Self-Slop Sweep removes only your own just-added, zero-reference diff code.
 - **Duplication is cheaper than the wrong abstraction.** Never extract a shared abstraction to kill duplication unless ≥3 sites (Rule of Three) AND they encode the same knowledge (one reason to change). Cleaning slop must not create slop.
 - **The gate recommends; the user decides.** No option question to the user without a "(Empfohlen)" recommendation (DECISION GATE) — and never decide autonomously what the user reserved for themselves.
+- **An example in the requirement is DATA, never CODE.** Universal requirement ("every industry", "any domain") → no example literal in `if`/`switch`/regex/lookup control flow; build the generic mechanism (classifier/parser/DB/AI), keep concrete values in config/tests. Honest single-value business rules need an `INTENTIONAL-SPECIAL-CASE:` marker with a real reason. Detector: `tools/detect-hardcoded-cases.py` (`references/generalization-gate.md`).
 - Version history and gate rationale: `references/design-rationale.md` (load only when editing this skill).

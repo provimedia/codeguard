@@ -2,7 +2,7 @@
 
 A mandatory audit skill for [Claude Code](https://claude.com/claude-code) that prevents bugs by enforcing plan-time, build-time, and debug-time reflexes. Born from real bugs that escaped audits in production — every rule is backed by a concrete incident citation in `SKILL.md`.
 
-- **Version:** v12 (Decision Gate Edition)
+- **Version:** v13 (Generalization Edition)
 - **Platform:** macOS / Linux
 - **Languages:** English + German trigger phrases
 
@@ -85,6 +85,18 @@ Orthogonal to all modes: whenever the agent is about to present the user an **op
 
 Binding output: recommended option **first**, label suffixed "(Empfohlen)" / "(Recommended)", 1–2 sentence rubric justification, all other options presented fairly with their honest trade-off. Full protocol: `code-guardian/references/decision-gate.md`. Optional deterministic enforcement via a `PreToolUse` hook — see "Recommended Companion Settings".
 
+### Generalization Gate (v13)
+
+Kills the overfitting anti-pattern: AI models hardcode example values from the requirement (`if ($domain === 'domain1.de')`, a regex matching exactly the example, switch chains, lookup arrays) even when the requirement is universal ("every industry") — the solution then works for exactly one input instead of building the generic mechanism (classifier/parser/DB lookup/AI analysis).
+
+- **The law:** *an example in the requirement is DATA, never CODE* — no example literal in control flow when the requirement quantifies universally.
+- **Two mandatory tests:** deletion test (remove the literal → the example must still work via the generic path) and second-example test (an equivalent value must take the same code path).
+- **Detector `tools/detect-hardcoded-cases.py`** (report-only, dependency-free): flags domains/URLs/emails/dates — plus everything passed via `--examples` — in decision contexts (`if/elif/switch/case/match`, comparisons, `in_array`/`.includes`/`str_contains`/`preg_match`, regex tests) and as lookup keys. Config/test/spec/fixture paths are ignored; low-FP by design.
+- **Honest exception:** genuine single-value business rules carry `INTENTIONAL-SPECIAL-CASE: <reason>` (same line or ≤3 lines above) — suppressed and counted as `intentional=` in the SUMMARY.
+- **Wired into:** PLAN MODE P7 (plan names the generic mechanism), BUILD audit Logic layer, and the always-on Self-Slop Sweep (`--git`, diff-only). Full law: `code-guardian/references/generalization-gate.md`.
+
+Validated against the trap fixture in `test/hardcoding/`: all 9 traps flagged, 0 false positives on the 6 clean cases.
+
 ---
 
 ## Repository Layout
@@ -105,7 +117,8 @@ Binding output: recommended option **first**, label suffixed "(Empfohlen)" / "(R
 │       ├── detect-clones.py       ← R2/R3/R5 cross-file clone detector (Rule-of-Three guard)
 │       ├── detect-config-leaks.sh ← R4 env()/getenv() leakage scanner
 │       ├── detect-symbol-loss.py  ← post-change silent-symbol-loss gate
-│       └── detect-dead-code.py    ← v11 report-only liveness aggregator (Self-Slop + CLEANUP MODE)
+│       ├── detect-dead-code.py    ← v11 report-only liveness aggregator (Self-Slop + CLEANUP MODE)
+│       └── detect-hardcoded-cases.py ← v13 example-hardcoding detector (Generalization Gate)
 └── llm-council/
     └── SKILL.md                   ← bundled companion — powers the Council Gates
 ```
@@ -251,6 +264,7 @@ Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denie
 
 ## Version History
 
+- **v13** (2026-07) — Generalization Gate. The examples-are-data law (no example literal from a universally-quantified requirement in `if`/`switch`/regex/lookup control flow), deletion + second-example tests, PLAN reflex P7, Logic-layer + Self-Slop integration, and the report-only detector `tools/detect-hardcoded-cases.py` (decision-context heuristic, `--examples`, `--git` diff mode, `INTENTIONAL-SPECIAL-CASE` escape hatch). Validated against `test/hardcoding/`: 9/9 traps flagged, 0 false positives on clean cases.
 - **v12** (2026-07) — Decision Gate. Orthogonal gate that fires before ANY option question to the user: tiered max-think (T1 rubric always · T2 parallel advocates on material divergence · T3 bundled `llm-council` on irreversible/≥5-consumer/foundation decisions), binding "(Empfohlen)"-first output format, explicit prohibition of autonomous deciding — the gate recommends, the user decides. New `references/decision-gate.md`; optional deterministic `PreToolUse` hook on `AskUserQuestion` (denies unrecommended option questions; deny reason self-corrects the model). `llm-council` companion now bundled in-repo and auto-installed by `install.sh` (install-only-if-missing).
 - **v11** (2026-06) — Cleanup & Anti-Slop. Always-on **Self-Slop Sweep** (BUILD audit Layer 6, diff-only) strips the agent's own AI-slop; opt-in **CLEANUP MODE** (report-only) classifies pre-existing dead/orphaned/redundant code (LIVE / ASSERTED-DEAD / VERIFIED-DEAD-PRIVATE) under a liveness-veto gate and never deletes productive code. New `tools/detect-dead-code.py` (report-only liveness aggregator) + Rule-of-Three guard in `detect-clones.py`. Validated against a 30-trap adversarial fixture (`test/`): CRITICAL_FP=0. *(Note: this history skips v8–v10.1, documented in `code-guardian/references/design-rationale.md`; the sections above still describe v7.1 and predate them.)*
 - **v7.1** (2026-05) — Blast-Radius Council Gate added to BUILD MODE Pre-Flight (step 1e). Proactive analog of DEBUG Phase 3's reactive gate. Strictly AND-of-4 gated (≥ 5 consumers + non-additive change + sparse test coverage + non-trivial reversal) to avoid council fatigue on routine pre-flights. Catches architectural divergence at build-time, orders of magnitude cheaper than catching it after a regression ships.
