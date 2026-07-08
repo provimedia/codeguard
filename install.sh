@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# Code Guardian Skill Installer (v12)
+# Code Guardian Skill Installer (v14)
 # -----------------------------------
 # Installs / updates the code-guardian skill for Claude Code, the bundled
-# llm-council companion, and the three session hooks (prompt-check, audit
-# reminder, DECISION GATE enforcement) incl. settings.json registration.
+# llm-council companion, and the four session hooks (prompt-check, audit
+# reminder, DECISION GATE + DEPLOY GATE enforcement) incl. settings.json
+# registration.
 # Works on macOS and Linux.
 #
 # Usage:
@@ -58,11 +59,11 @@ die()  { printf '\033[0;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
 [ -d "$SOURCE_DIR" ] || die "Source directory not found: $SOURCE_DIR"
 [ -f "$SOURCE_DIR/SKILL.md" ] || die "SKILL.md not found in source: $SOURCE_DIR/SKILL.md"
 [ -d "$SOURCE_DIR/tools" ] || die "tools/ directory not found in source: $SOURCE_DIR/tools"
-for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh detect-symbol-loss.py detect-dead-code.py detect-hardcoded-cases.py; do
+for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh detect-symbol-loss.py detect-dead-code.py detect-hardcoded-cases.py detect-deploy-artifacts.py; do
     [ -f "$SOURCE_DIR/tools/$tool" ] || die "Helper script missing: $SOURCE_DIR/tools/$tool"
 done
 [ -f "$COUNCIL_SOURCE_DIR/SKILL.md" ] || die "Bundled companion missing: $COUNCIL_SOURCE_DIR/SKILL.md"
-for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh; do
+for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh deploy-gate-check.sh; do
     [ -f "$HOOKS_SOURCE_DIR/$hook" ] || die "Bundled hook missing: $HOOKS_SOURCE_DIR/$hook"
 done
 
@@ -122,7 +123,8 @@ fi
 # Version check — confirm v13 structural markers + shipped features are present
 if [ "$DRY_RUN" -eq 0 ]; then
     missing=()
-    grep -q "Code Guardian (v13)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v13)")
+    grep -q "Code Guardian (v14)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v14)")
+    grep -q "DEPLOY GATE"                      "$TARGET_DIR/SKILL.md" || missing+=("DEPLOY GATE")
     grep -q "PLAN MODE"                        "$TARGET_DIR/SKILL.md" || missing+=("PLAN MODE")
     grep -q "BUILD MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("BUILD MODE")
     grep -q "DEBUG MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("DEBUG MODE")
@@ -135,8 +137,9 @@ if [ "$DRY_RUN" -eq 0 ]; then
     [ -f "$TARGET_DIR/tools/detect-symbol-loss.py" ] || missing+=("tools/detect-symbol-loss.py")
     [ -f "$TARGET_DIR/tools/detect-dead-code.py" ] || missing+=("tools/detect-dead-code.py")
     [ -f "$TARGET_DIR/tools/detect-hardcoded-cases.py" ] || missing+=("tools/detect-hardcoded-cases.py")
+    [ -f "$TARGET_DIR/tools/detect-deploy-artifacts.py" ] || missing+=("tools/detect-deploy-artifacts.py")
     if [ ${#missing[@]} -eq 0 ]; then
-        ok "v13 markers + symbol-loss + dead-code + decision + generalization gates detected in installed skill"
+        ok "v14 markers + symbol-loss + dead-code + decision + generalization + deploy gates detected in installed skill"
     else
         warn "Missing markers: ${missing[*]} — installed version may be outdated"
     fi
@@ -179,11 +182,11 @@ fi
 log "Hooks: installing scripts + registering in settings.json"
 if [ "$DRY_RUN" -eq 0 ]; then
     mkdir -p "$HOOKS_TARGET_DIR"
-    for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh; do
+    for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh deploy-gate-check.sh; do
         cp "$HOOKS_SOURCE_DIR/$hook" "$HOOKS_TARGET_DIR/$hook"
         chmod +x "$HOOKS_TARGET_DIR/$hook"
     done
-    ok "3 hook script(s) installed -> $HOOKS_TARGET_DIR"
+    ok "4 hook script(s) installed -> $HOOKS_TARGET_DIR"
 
     if command -v python3 >/dev/null 2>&1; then
         if [ -f "$SETTINGS_FILE" ]; then
@@ -199,6 +202,7 @@ wanted = [
     ("UserPromptSubmit", None,              "code-guardian-prompt-check.sh"),
     ("PostToolUse",      "Write|Edit",      "code-guardian-reminder.sh"),
     ("PreToolUse",       "AskUserQuestion", "decision-gate-check.sh"),
+    ("PreToolUse",       "Bash",            "deploy-gate-check.sh"),
 ]
 
 settings = {}
@@ -265,7 +269,8 @@ echo "     session will not pick them up (verify with /hooks in the new session)
 echo "  2. Verify Claude Code sees the skill:"
 echo "     claude → type /help and look for code-guardian in the skills list"
 echo "  3. The skill is auto-activated when you write/edit code or report a bug;"
-echo "     the DECISION GATE blocks option questions without a recommendation."
+echo "     the DECISION GATE blocks option questions without a recommendation;"
+echo "     the DEPLOY GATE blocks deploy commands without a fresh gate report."
 echo "  4. To uninstall, run:   rm -rf ~/.claude/skills/code-guardian"
 echo
 if [ "$DRY_RUN" -eq 1 ]; then

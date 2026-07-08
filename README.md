@@ -97,6 +97,20 @@ Kills the overfitting anti-pattern: AI models hardcode example values from the r
 
 Validated against the trap fixture in `test/hardcoding/`: all 9 traps flagged, 0 false positives on the 6 clean cases.
 
+### Deploy Gate (v14)
+
+Nothing reaches an external server unclassified. The second orthogonal gate (v12 routing shape) fires in ANY mode the moment a deployment/transfer is about to run — `deploy.sh`, remote `rsync`/`scp`/`sftp`, `ftp`/`lftp`, `git push` to a prod remote — and also as a pure server-hygiene audit ("liegt X auf dem Server?").
+
+- **The 4-class law (transfer and existence are independent dimensions):** DEPLOY (app code) · **SERVER-ONLY** (never transfer, MUST exist server-side, never delete — prod `.env`, `storage/`, uploads, certs) · **NEVER-ON-SERVER** (neither transfer nor tolerate — tests, docs, `*.sql` dumps, `.git`, CI/IDE/OS junk, `.audit-log.md`) · REVIEW (context decides — `node_modules/`, seeders).
+- **D1 Manifest check:** classify the REAL transfer list (`rsync --dry-run --itemize-changes | detect-deploy-artifacts.py --list -`); SERVER-ONLY or NEVER[high] in the list → BLOCKED.
+- **D2 Durable excludes:** fixes land committed in the deploy mechanism, never as one-off filters.
+- **D3 Server retro-check:** HTTP leak probes (expect 403/404) + SSH find; a SERVER-ONLY file answering 200 (`/.env`) is a 🔴 webserver-config fix, never a deletion.
+- **D4 Removal:** classified leftover list → ONE user approval → delete → re-probe VERIFIED.
+- **Detector `tools/detect-deploy-artifacts.py`** (report-only, dependency-free): data-table catalogs, two risk tiers (NEVER[high] blocks, NEVER[low] warns — no fatigue), per-project `.code-guardian-deploy.yml` (`extra_never`, `extra_server_only`, reasoned `allow:` exceptions).
+- **Deterministic enforcement:** `hooks/deploy-gate-check.sh` (PreToolUse on Bash) denies deploy commands while no fresh (<30 min) `.code-guardian-deploy-report.md` with `DEPLOY GATE: APPROVED` exists; the gate's own `--dry-run` probe, local rsync, and non-prod `git push` are carved out.
+
+Validated against `test/deploy/`: every planted trap flagged in `--root` and `--list` mode, 0 false positives on clean app files; hook matrix 6 deny / 5 allow + 4 freshness cases.
+
 ---
 
 ## Repository Layout
@@ -109,7 +123,8 @@ Validated against the trap fixture in `test/hardcoding/`: all 9 traps flagged, 0
 ├── hooks/
 │   ├── code-guardian-prompt-check.sh  ← UserPromptSubmit: skill reminder on code/bug prompts
 │   ├── code-guardian-reminder.sh      ← PostToolUse (Write|Edit): audit reminder
-│   └── decision-gate-check.sh         ← PreToolUse (AskUserQuestion): v12 DECISION GATE enforcement
+│   ├── decision-gate-check.sh         ← PreToolUse (AskUserQuestion): v12 DECISION GATE enforcement
+│   └── deploy-gate-check.sh           ← PreToolUse (Bash): v14 DEPLOY GATE enforcement
 ├── code-guardian/
 │   ├── SKILL.md                   ← the skill definition (~1110 lines)
 │   └── tools/
@@ -118,7 +133,8 @@ Validated against the trap fixture in `test/hardcoding/`: all 9 traps flagged, 0
 │       ├── detect-config-leaks.sh ← R4 env()/getenv() leakage scanner
 │       ├── detect-symbol-loss.py  ← post-change silent-symbol-loss gate
 │       ├── detect-dead-code.py    ← v11 report-only liveness aggregator (Self-Slop + CLEANUP MODE)
-│       └── detect-hardcoded-cases.py ← v13 example-hardcoding detector (Generalization Gate)
+│       ├── detect-hardcoded-cases.py ← v13 example-hardcoding detector (Generalization Gate)
+│       └── detect-deploy-artifacts.py ← v14 deploy-artifact classifier (Deploy Gate)
 └── llm-council/
     └── SKILL.md                   ← bundled companion — powers the Council Gates
 ```
@@ -238,7 +254,11 @@ Optional — the skill self-activates via its frontmatter triggers regardless.
 
 Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denies** any `AskUserQuestion` call whose options carry no "(Empfohlen)" / "(Recommended)" marker. The deny reason is fed back to the model (doc-backed: PreToolUse stdout is not visible to the model, `permissionDecisionReason` is), which re-runs the gate and re-issues the question with a recommendation — a self-correcting loop. Requires `jq`; without it the hook fails **open** (no blocking; the skill-level rule still applies).
 
-**`install.sh` sets this up automatically** — it copies `hooks/decision-gate-check.sh` (plus the two reminder hooks) to `~/.claude/hooks/` and registers all three in `~/.claude/settings.json` (idempotent, backup taken). Restart Claude Code afterwards; verify with `/hooks`.
+**`install.sh` sets this up automatically** — it copies `hooks/decision-gate-check.sh` (plus the two reminder hooks) to `~/.claude/hooks/` and registers all hooks in `~/.claude/settings.json` (idempotent, backup taken). Restart Claude Code afterwards; verify with `/hooks`.
+
+### Deploy Gate enforcement hook (v14 — installed automatically)
+
+Deterministic enforcement of the DEPLOY GATE: a `PreToolUse` hook on **Bash** that **denies** deploy commands (remote `rsync`/`scp`/`sftp`, `ftp`/`lftp`, `deploy*.sh`, `git push` to prod/production/live remotes) while no fresh (<30 min) `.code-guardian-deploy-report.md` with `DEPLOY GATE: APPROVED` exists in the project root. The deny reason walks the model through D1/D2 and the report format — the same self-correcting loop as the Decision Gate hook. Carve-outs: `rsync --dry-run`/`-n` (the gate's own manifest probe), local rsync, non-prod `git push`. Requires `jq`; fails **open** without it.
 
 **Manual fallback** (only if the automatic registration was skipped — corrupt settings.json or no `python3`): copy the scripts from this repo's `hooks/` directory to `~/.claude/hooks/`, `chmod +x` them, and add to `~/.claude/settings.json`:
 
@@ -255,6 +275,9 @@ Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denie
     "PreToolUse": [{
       "matcher": "AskUserQuestion",
       "hooks": [{ "type": "command", "command": "~/.claude/hooks/decision-gate-check.sh" }]
+    }, {
+      "matcher": "Bash",
+      "hooks": [{ "type": "command", "command": "~/.claude/hooks/deploy-gate-check.sh" }]
     }]
   }
 }
@@ -264,6 +287,7 @@ Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denie
 
 ## Version History
 
+- **v14** (2026-07) — Deploy Gate. Second orthogonal gate: no file reaches an external server unclassified. 4-class law (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER[high|low] / REVIEW; transfer and existence are independent dimensions), D1 manifest check on the real transfer list, D2 durable committed excludes, D3 server retro-check (HTTP probes + SSH find; SERVER-ONLY reachable over HTTP = webserver fix, never deletion), D4 leftover removal only after ONE user approval with re-probe verification. New `references/deploy-gate.md`, report-only classifier `tools/detect-deploy-artifacts.py` (data-table catalogs, `.code-guardian-deploy.yml` overrides), fourth hook `deploy-gate-check.sh` (PreToolUse on Bash, dry-run/local/non-prod carve-outs). Validated against `test/deploy/` + 15-case hook matrix.
 - **v13** (2026-07) — Generalization Gate. The examples-are-data law (no example literal from a universally-quantified requirement in `if`/`switch`/regex/lookup control flow), deletion + second-example tests, PLAN reflex P7, Logic-layer + Self-Slop integration, and the report-only detector `tools/detect-hardcoded-cases.py` (decision-context heuristic, `--examples`, `--git` diff mode, `INTENTIONAL-SPECIAL-CASE` escape hatch). Validated against `test/hardcoding/`: 9/9 traps flagged, 0 false positives on clean cases.
 - **v12** (2026-07) — Decision Gate. Orthogonal gate that fires before ANY option question to the user: tiered max-think (T1 rubric always · T2 parallel advocates on material divergence · T3 bundled `llm-council` on irreversible/≥5-consumer/foundation decisions), binding "(Empfohlen)"-first output format, explicit prohibition of autonomous deciding — the gate recommends, the user decides. New `references/decision-gate.md`; optional deterministic `PreToolUse` hook on `AskUserQuestion` (denies unrecommended option questions; deny reason self-corrects the model). `llm-council` companion now bundled in-repo and auto-installed by `install.sh` (install-only-if-missing).
 - **v11** (2026-06) — Cleanup & Anti-Slop. Always-on **Self-Slop Sweep** (BUILD audit Layer 6, diff-only) strips the agent's own AI-slop; opt-in **CLEANUP MODE** (report-only) classifies pre-existing dead/orphaned/redundant code (LIVE / ASSERTED-DEAD / VERIFIED-DEAD-PRIVATE) under a liveness-veto gate and never deletes productive code. New `tools/detect-dead-code.py` (report-only liveness aggregator) + Rule-of-Three guard in `detect-clones.py`. Validated against a 30-trap adversarial fixture (`test/`): CRITICAL_FP=0. *(Note: this history skips v8–v10.1, documented in `code-guardian/references/design-rationale.md`; the sections above still describe v7.1 and predate them.)*
