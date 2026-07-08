@@ -178,11 +178,6 @@ def load_config(path):
     return conf
 
 
-def _segment_match(path, name):
-    """True if `name` equals any directory segment of `path`."""
-    return name in path.split("/")[:-1] or path.rstrip("/").split("/")[-1] == name and path.endswith("/")
-
-
 def _match_entry(path, kind, pattern):
     base = path.rstrip("/").split("/")[-1]
     if kind == "dir":
