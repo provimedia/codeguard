@@ -124,6 +124,13 @@ def test_itemize_prefix_stripped():
     assert dda.parse_list_line("deleting old/gone.php") is None
 
 
+def test_itemize_prefix_stripped_short_format():
+    # rsync 2.6.x / macOS openrsync emit 9-char prefixes (found live 2026-07-08)
+    assert dda.parse_list_line(">f....... .env") == ".env"
+    assert dda.parse_list_line(">f....... tests/Feature/LoginTest.php") == "tests/Feature/LoginTest.php"
+    assert dda.parse_list_line("cd+++++++ database/seeders/") == "database/seeders/"
+
+
 def test_plain_path_passthrough_and_noise_skipped():
     assert dda.parse_list_line("app/Models/User.php") == "app/Models/User.php"
     assert dda.parse_list_line("") is None

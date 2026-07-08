@@ -8,3 +8,6 @@ run-iteration.md
 deploy.sh
 readme.txt
 __pycache__/
+
+# DEPLOY GATE report — ephemeral working data (v14)
+.code-guardian-deploy-report.md

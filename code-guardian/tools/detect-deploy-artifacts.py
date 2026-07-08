@@ -140,7 +140,9 @@ _RSYNC_NOISE_PREFIXES = (
     "building file list", "created directory", "sent ", "total size",
     "deleting ", "*deleting",
 )
-_ITEMIZE_RE = re.compile(r"^[<>ch.*][fdLDSg][.+?cstTpoguaxn]{9}\s+(.+)$")
+# Itemize prefix width varies by implementation: rsync 3.x uses 11 chars
+# (>f+++++++++), rsync 2.6.x / macOS openrsync 9 chars (>f.......).
+_ITEMIZE_RE = re.compile(r"^[<>ch.*][fdLDSg][.+?cstTpoguaxn]{7,9}\s+(.+)$")
 
 
 def load_config(path):
