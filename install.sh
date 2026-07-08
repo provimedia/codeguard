@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
-# Code Guardian Skill Installer (v7.1)
+# Code Guardian Skill Installer (v12)
 # -----------------------------------
-# Installs / updates the code-guardian skill for Claude Code.
+# Installs / updates the code-guardian skill for Claude Code, the bundled
+# llm-council companion, and the three session hooks (prompt-check, audit
+# reminder, DECISION GATE enforcement) incl. settings.json registration.
 # Works on macOS and Linux.
 #
 # Usage:
@@ -20,6 +22,11 @@ TARGET_DIR="${TARGET_ROOT}/code-guardian"
 # (DEBUG Phase 3, two-failure Escalation, BUILD Pre-Flight 1e Blast-Radius).
 COUNCIL_SOURCE_DIR="${SCRIPT_DIR}/llm-council"
 COUNCIL_TARGET_DIR="${TARGET_ROOT}/llm-council"
+# Bundled hooks — make the skill the default in EVERY session (prompt-check,
+# post-edit audit reminder) and enforce the v12 DECISION GATE (AskUserQuestion).
+HOOKS_SOURCE_DIR="${SCRIPT_DIR}/hooks"
+HOOKS_TARGET_DIR="${HOME}/.claude/hooks"
+SETTINGS_FILE="${HOME}/.claude/settings.json"
 # Backups live OUTSIDE the skills root — a backup placed under skills/ is
 # auto-discovered by Claude Code as a duplicate skill (it has a SKILL.md).
 BACKUP_ROOT="${HOME}/.claude/skill-backups"
@@ -55,10 +62,14 @@ for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh detect-sym
     [ -f "$SOURCE_DIR/tools/$tool" ] || die "Helper script missing: $SOURCE_DIR/tools/$tool"
 done
 [ -f "$COUNCIL_SOURCE_DIR/SKILL.md" ] || die "Bundled companion missing: $COUNCIL_SOURCE_DIR/SKILL.md"
+for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh; do
+    [ -f "$HOOKS_SOURCE_DIR/$hook" ] || die "Bundled hook missing: $HOOKS_SOURCE_DIR/$hook"
+done
 
 log "Source:  $SOURCE_DIR"
 log "Target:  $TARGET_DIR"
 log "Companion: $COUNCIL_SOURCE_DIR -> $COUNCIL_TARGET_DIR"
+log "Hooks:   $HOOKS_SOURCE_DIR -> $HOOKS_TARGET_DIR (+ settings.json merge)"
 
 # Create parent directory if needed
 if [ ! -d "$TARGET_ROOT" ]; then
@@ -158,15 +169,102 @@ else
     fi
 fi
 
+# Hooks: copy scripts + register them in ~/.claude/settings.json (idempotent merge).
+# - Scripts are versioned with this package -> always overwritten on update.
+# - settings.json: backup first, only OUR three entries are added if absent,
+#   everything else in the file is left byte-identical. Corrupt/missing python3
+#   -> warn + manual instructions, never touch the file.
+log "Hooks: installing scripts + registering in settings.json"
+if [ "$DRY_RUN" -eq 0 ]; then
+    mkdir -p "$HOOKS_TARGET_DIR"
+    for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh; do
+        cp "$HOOKS_SOURCE_DIR/$hook" "$HOOKS_TARGET_DIR/$hook"
+        chmod +x "$HOOKS_TARGET_DIR/$hook"
+    done
+    ok "3 hook script(s) installed -> $HOOKS_TARGET_DIR"
+
+    if command -v python3 >/dev/null 2>&1; then
+        if [ -f "$SETTINGS_FILE" ]; then
+            SETTINGS_BACKUP="${SETTINGS_FILE}.backup-code-guardian.$(date +%Y%m%d-%H%M%S)"
+            cp "$SETTINGS_FILE" "$SETTINGS_BACKUP"
+            log "settings.json backup: $SETTINGS_BACKUP"
+        fi
+        if python3 - "$SETTINGS_FILE" "$HOOKS_TARGET_DIR" <<'PY'
+import json, os, sys
+
+path, hooks_dir = sys.argv[1], sys.argv[2]
+wanted = [
+    ("UserPromptSubmit", None,              "code-guardian-prompt-check.sh"),
+    ("PostToolUse",      "Write|Edit",      "code-guardian-reminder.sh"),
+    ("PreToolUse",       "AskUserQuestion", "decision-gate-check.sh"),
+]
+
+settings = {}
+if os.path.exists(path):
+    try:
+        with open(path) as f:
+            settings = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        sys.exit(3)  # corrupt -> never touch
+
+hooks = settings.setdefault("hooks", {})
+added = []
+for event, matcher, basename in wanted:
+    entries = hooks.setdefault(event, [])
+    present = any(
+        h.get("command", "").endswith(basename)
+        for e in entries if isinstance(e, dict)
+        for h in e.get("hooks", []) if isinstance(h, dict)
+    )
+    if present:
+        continue
+    entry = {"hooks": [{"type": "command", "command": os.path.join(hooks_dir, basename)}]}
+    if matcher is not None:
+        entry["matcher"] = matcher
+    entries.append(entry)
+    added.append(f"{event} -> {basename}")
+
+if added:
+    with open(path, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("ADDED: " + ", ".join(added))
+else:
+    print("ALL PRESENT")
+PY
+        then
+            ok "settings.json: hook registration complete (existing entries untouched)"
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$SETTINGS_FILE" \
+                && ok "settings.json is valid JSON" \
+                || die "settings.json failed JSON validation after merge — restore the backup!"
+        else
+            warn "settings.json is not valid JSON — file NOT touched."
+            warn "Register the hooks manually (see UPDATE-ANLEITUNG.md / README, section hooks)."
+        fi
+    else
+        warn "python3 not found — hooks copied but NOT registered in settings.json."
+        warn "Register them manually (see UPDATE-ANLEITUNG.md / README, section hooks)."
+    fi
+else
+    ok "hooks + settings.json merge would run (dry-run)"
+fi
+
 echo
 ok "Code Guardian skill installation complete."
 echo
+if ! command -v jq >/dev/null 2>&1; then
+    warn "jq not found — the hooks fail OPEN without it (skill rules still apply)."
+    warn "Install it for full hook enforcement:  brew install jq  (macOS) / apt install jq (Linux)"
+fi
+
 echo "Next steps:"
-echo "  1. Verify Claude Code sees the skill:"
+echo "  1. RESTART Claude Code — hooks are read at session start; a running"
+echo "     session will not pick them up (verify with /hooks in the new session)."
+echo "  2. Verify Claude Code sees the skill:"
 echo "     claude → type /help and look for code-guardian in the skills list"
-echo "     (or restart Claude Code if it was already running)"
-echo "  2. The skill is auto-activated when you write/edit code or report a bug."
-echo "  3. To uninstall, run:   rm -rf ~/.claude/skills/code-guardian"
+echo "  3. The skill is auto-activated when you write/edit code or report a bug;"
+echo "     the DECISION GATE blocks option questions without a recommendation."
+echo "  4. To uninstall, run:   rm -rf ~/.claude/skills/code-guardian"
 echo
 if [ "$DRY_RUN" -eq 1 ]; then
     warn "DRY RUN — nothing was actually changed"

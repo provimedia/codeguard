@@ -93,6 +93,11 @@ Binding output: recommended option **first**, label suffixed "(Empfohlen)" / "(R
 .
 ├── install.sh                     ← automated installer (macOS + Linux)
 ├── README.md                      ← this file
+├── UPDATE-ANLEITUNG.md            ← German update guide for team rollouts
+├── hooks/
+│   ├── code-guardian-prompt-check.sh  ← UserPromptSubmit: skill reminder on code/bug prompts
+│   ├── code-guardian-reminder.sh      ← PostToolUse (Write|Edit): audit reminder
+│   └── decision-gate-check.sh         ← PreToolUse (AskUserQuestion): v12 DECISION GATE enforcement
 ├── code-guardian/
 │   ├── SKILL.md                   ← the skill definition (~1110 lines)
 │   └── tools/
@@ -123,9 +128,10 @@ The installer will:
 - Back up any existing `code-guardian` install to `~/.claude/skills/code-guardian.backup.YYYYMMDD-HHMMSS`
 - Copy `SKILL.md` and `tools/` into `~/.claude/skills/code-guardian/`
 - Set executable bits on the helper scripts
-- Verify that v5 + v6 + v7 + v7.1 markers are present
+- Verify that the version markers are present (v12: `Code Guardian (v12)`, `DECISION GATE`, …)
 - Install the bundled `llm-council` companion into `~/.claude/skills/llm-council/` **only if it is not already present** (an existing council is left untouched unless `--force` is passed)
-- Print next steps
+- Install the three bundled hooks into `~/.claude/hooks/` and **register them in `~/.claude/settings.json` automatically** — idempotent merge with a timestamped backup; existing entries and all other keys are left untouched. Corrupt JSON or missing `python3` → the file is never touched, manual instructions are printed instead.
+- Print next steps — **restart Claude Code afterwards**: hooks are read at session start (`/hooks` to verify)
 
 ### Installer options
 
@@ -215,29 +221,24 @@ Add to `~/.claude/settings.json` to fire an audit reminder after every `Write` /
 
 Optional — the skill self-activates via its frontmatter triggers regardless.
 
-### Decision Gate enforcement hook (v12, optional but recommended)
+### Decision Gate enforcement hook (v12 — installed automatically)
 
-Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denies** any `AskUserQuestion` call whose options carry no "(Empfohlen)" / "(Recommended)" marker. The deny reason is fed back to the model (doc-backed: PreToolUse stdout is not visible to the model, `permissionDecisionReason` is), which re-runs the gate and re-issues the question with a recommendation — a self-correcting loop.
+Deterministic enforcement of the DECISION GATE: a `PreToolUse` hook that **denies** any `AskUserQuestion` call whose options carry no "(Empfohlen)" / "(Recommended)" marker. The deny reason is fed back to the model (doc-backed: PreToolUse stdout is not visible to the model, `permissionDecisionReason` is), which re-runs the gate and re-issues the question with a recommendation — a self-correcting loop. Requires `jq`; without it the hook fails **open** (no blocking; the skill-level rule still applies).
 
-Save as `~/.claude/hooks/decision-gate-check.sh` (`chmod +x`), requires `jq`:
+**`install.sh` sets this up automatically** — it copies `hooks/decision-gate-check.sh` (plus the two reminder hooks) to `~/.claude/hooks/` and registers all three in `~/.claude/settings.json` (idempotent, backup taken). Restart Claude Code afterwards; verify with `/hooks`.
 
-```bash
-#!/bin/bash
-INPUT=$(cat)
-LABELS=$(echo "$INPUT" | jq -r '[.tool_input.questions[]?.options[]?.label // empty] | join("\n")' 2>/dev/null)
-QUESTIONS=$(echo "$INPUT" | jq -r '[.tool_input.questions[]?.question // empty] | join("\n")' 2>/dev/null)
-echo "$LABELS"    | grep -qiE '\((Empfohlen|Recommended)\)' && exit 0
-echo "$QUESTIONS" | grep -qi  'keine-empfehlung\|no-recommendation' && exit 0
-cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"DECISION GATE (code-guardian v12): option question without a recommendation. Run references/decision-gate.md first (T1 rubric, T2/T3 if triggered), then re-issue the question with the recommended option FIRST, label suffixed ' (Empfohlen)'/' (Recommended)', plus a 1-2 sentence rubric justification. The gate recommends; the user decides. Exception for pure-preference questions: append '[keine-empfehlung: <reason>]' to the question text."}}
-EOF
-```
-
-Register in `~/.claude/settings.json`:
+**Manual fallback** (only if the automatic registration was skipped — corrupt settings.json or no `python3`): copy the scripts from this repo's `hooks/` directory to `~/.claude/hooks/`, `chmod +x` them, and add to `~/.claude/settings.json`:
 
 ```json
 {
   "hooks": {
+    "UserPromptSubmit": [{
+      "hooks": [{ "type": "command", "command": "~/.claude/hooks/code-guardian-prompt-check.sh" }]
+    }],
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{ "type": "command", "command": "~/.claude/hooks/code-guardian-reminder.sh" }]
+    }],
     "PreToolUse": [{
       "matcher": "AskUserQuestion",
       "hooks": [{ "type": "command", "command": "~/.claude/hooks/decision-gate-check.sh" }]
