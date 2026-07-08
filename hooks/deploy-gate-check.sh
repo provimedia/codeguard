@@ -31,6 +31,13 @@ INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [ -n "$CMD" ] || exit 0
 
+# Self-reference carve-out: commands that test/inspect THIS hook are not a
+# deploy — without this, the hook's own filename matches the deploy*.sh
+# pattern and every manual `echo … | deploy-gate-check.sh` verification
+# (see UPDATE-ANLEITUNG Schritt 3) would be denied. Found live on 2026-07-08:
+# the hook blocked its own post-install functional test.
+echo "$CMD" | grep -q 'deploy-gate-check\.sh' && exit 0
+
 REMOTE_SPEC='([A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*:[^ ]'
 
 is_deploy=0
