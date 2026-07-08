@@ -17,13 +17,19 @@ description: >
   "unused", "ungenutzt", "orphan", "verwaist", "redundant", "remove duplicates" — report-only, never deletes productive code.
   Use when (DECISION GATE): about to present the user ANY option question (A/B/C, variant 1/2/3,
   "which approach?") — a recommendation is mandatory first; the gate recommends, the user decides.
+  Use when (DEPLOY GATE): about to run ANY deployment/transfer to an external server — deploy.sh,
+  rsync, scp, sftp, ftp, git push to a production remote — or the user says "deploy", "deployen",
+  "live stellen", "auf den Server", "hochladen", "publish", "release", "go-live", or asks whether
+  leftovers (tests, docs, dumps) sit on the server. Classify EVERY file before transfer
+  (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER / REVIEW); leftovers found server-side are reported
+  and removed only after user approval.
   ANTI-RATIONALIZATION: If you think "this is too small to need an audit" — that IS the trigger.
   If you think "I already understand this" — that IS the trigger.
   If you think "the user is waiting, just do it quickly" — that IS the trigger.
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v13)
+# Code Guardian (v14)
 
 ## Operating Principles
 
@@ -50,7 +56,7 @@ Task received
 
 Each mode is **mutually exclusive** — the full protocol lives in a per-mode reference file. Read ONLY the selected mode's file; that keeps this always-loaded body small (progressive disclosure). The skeleton below is the router, not the whole procedure — **load the mode file before acting.**
 
-The **DECISION GATE** is orthogonal to mode selection: it fires in ANY mode (and outside them) the moment an option question is about to go to the user.
+Two gates are orthogonal to mode selection and fire in ANY mode (and outside them): the **DECISION GATE** the moment an option question is about to go to the user, and the **DEPLOY GATE** the moment a deployment/transfer to an external server is about to run.
 
 ## Reference Files (progressive disclosure)
 
@@ -63,6 +69,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | `references/debug-mode.md` | 5-phase debug protocol + escalation | DEBUG MODE selected |
 | `references/cleanup-mode.md` | opt-in report-only dead/orphaned/redundant-code protocol: liveness-veto gate, framework FP-category gate, per-language detectors, redundancy counter-rule | CLEANUP MODE selected (explicit cleanup request only) |
 | `references/decision-gate.md` | T1 rubric matrix, T2 advocate / T3 council escalation triggers, binding "(Empfohlen)" output template | DECISION GATE fires (an option question is about to go to the user) |
+| `references/deploy-gate.md` | 4-class law (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER / REVIEW), D1 manifest check, D2 durable excludes, D3 server retro-check, D4 approved removal, report artifact + `.code-guardian-deploy.yml` | DEPLOY GATE fires (a deploy/transfer to an external server is about to run, or server hygiene is questioned) |
 | `references/generalization-gate.md` | the examples-are-data law, deletion + second-example tests, `detect-hardcoded-cases.py` usage, INTENTIONAL-SPECIAL-CASE marker | PLAN P7 runs, or the audit/Self-Slop flags a hardcoded example |
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |
 | `references/audit-deep-checks.md` | Full-depth layer checks (DB, Logic, Efficiency, Security) + R1–R5 redundancy detectors in detail | any audit layer runs at full depth |
@@ -142,6 +149,21 @@ Full rubric, escalation triggers, council framing, output template: `references/
 
 ---
 
+## DEPLOY GATE
+
+About to run ANY deployment/transfer to an external server (deploy.sh, rsync/scp/sftp/ftp, git push to a prod remote, "live stellen") → **Read `references/deploy-gate.md`** and run the gate BEFORE the transfer. Nothing reaches a server unclassified.
+
+- **The Law — 4 classes, 2 independent dimensions (transfer / exist):** DEPLOY (app code) · SERVER-ONLY (never transfer, MUST exist server-side, never delete: prod `.env`, `storage/`, uploads, certs) · NEVER-ON-SERVER (neither transfer nor tolerate: tests, docs, dumps, `.git`, CI/IDE/OS junk, `.audit-log.md`) · REVIEW (context decides: `node_modules/`, seeders).
+- **D1 Manifest check:** classify the real transfer list (rsync `--dry-run --itemize-changes` piped into `detect-deploy-artifacts.py --list -`; else `--root` + mechanism excludes). SERVER-ONLY or NEVER[high] in the list → **BLOCKED**.
+- **D2 Durable excludes:** the fix lands committed in the deploy mechanism (`deploy.sh` excludes / `.deployignore`) — never a one-off filter.
+- **D3 Server retro-check:** HTTP probes (expect 403/404) + SSH find where available; a SERVER-ONLY file answering 200 (e.g. `/.env`) → 🔴 fix webserver config, NEVER delete. No channel → "⚠️ Server unchecked".
+- **D4 Removal:** classified list → ONE user approval → delete via ssh/ftp → re-probe VERIFIED. SERVER-ONLY is exempt from removal by law.
+- **Report artifact:** write `.code-guardian-deploy-report.md` (gitignored, ephemeral) ending `DEPLOY GATE: APPROVED|BLOCKED` — the enforcement hook requires a fresh APPROVED report before any deploy command runs; the gate's own `--dry-run` probes are exempt.
+
+Full protocol, probe tables, config reference: `references/deploy-gate.md`.
+
+---
+
 ## Self-Tuning
 
 When reading `.audit-log.md` at audit start:
@@ -158,5 +180,6 @@ When reading `.audit-log.md` at audit start:
 - **Never delete productive code; absence of references never proves dead.** Any single positive signal (a reference, a route/template/DI/DB-dispatch/config hit) vetoes removal. CLEANUP MODE is report-only; the Self-Slop Sweep removes only your own just-added, zero-reference diff code.
 - **Duplication is cheaper than the wrong abstraction.** Never extract a shared abstraction to kill duplication unless ≥3 sites (Rule of Three) AND they encode the same knowledge (one reason to change). Cleaning slop must not create slop.
 - **The gate recommends; the user decides.** No option question to the user without a "(Empfohlen)" recommendation (DECISION GATE) — and never decide autonomously what the user reserved for themselves.
+- **Nothing reaches a server unclassified.** Every deploy passes the DEPLOY GATE: classify the full transfer list (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER / REVIEW). NEVER artifacts (tests, docs, dumps, audit logs, VCS/IDE files) are excluded durably in the deploy mechanism and removed from the server only after user approval; SERVER-ONLY files (prod `.env`, `storage/`, uploads) are never transferred AND never deleted. Detector: `tools/detect-deploy-artifacts.py` (`references/deploy-gate.md`).
 - **An example in the requirement is DATA, never CODE.** Universal requirement ("every industry", "any domain") → no example literal in `if`/`switch`/regex/lookup control flow; build the generic mechanism (classifier/parser/DB/AI), keep concrete values in config/tests. Honest single-value business rules need an `INTENTIONAL-SPECIAL-CASE:` marker with a real reason. Detector: `tools/detect-hardcoded-cases.py` (`references/generalization-gate.md`).
 - Version history and gate rationale: `references/design-rationale.md` (load only when editing this skill).
