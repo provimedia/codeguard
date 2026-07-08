@@ -1,0 +1,21 @@
+sending incremental file list
+cd+++++++++ app/
+>f+++++++++ app/Http/Controllers/HomeController.php
+>f+++++++++ public/index.php
+>f+++++++++ resources/views/home.blade.php
+>f+++++++++ database/migrations/2026_01_01_create_users.php
+>f+++++++++ database/seeders/DemoSeeder.php
+cd+++++++++ tests/
+>f+++++++++ tests/Feature/LoginTest.php
+>f+++++++++ docs/architecture.md
+>f+++++++++ .env
+>f+++++++++ dump.sql
+>f+++++++++ backup-2026.tar.gz
+>f+++++++++ .audit-log.md
+>f+++++++++ .DS_Store
+>f+++++++++ phpunit.xml
+>f+++++++++ .github/workflows/ci.yml
+>f+++++++++ storage/logs/laravel.log
+*deleting   old/legacy.php
+sent 1,234 bytes  received 56 bytes
+total size is 9,999  speedup is 42.00
