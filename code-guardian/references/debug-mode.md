@@ -35,7 +35,7 @@ Never propose just one fix.
 
 ### Phase 5: IMPLEMENT + VERIFY
 
-1. Fix + adjust all affected dependencies → 2. test reproducing the bug (now green) → 3. existing tests still green → 4. confirm bug gone, edge cases handled, dependencies intact → 5. run the BUILD MODE post-change symbol-loss gate and Audit on the fix diff (`references/build-mode.md`, Step 2.1 + Step 3a–3g) — a fix is a code change like any other.
+1. Fix + adjust all affected dependencies → 2. test reproducing the bug (now green) → 3. existing tests still green → 4. confirm bug gone, edge cases handled, dependencies intact → 5. run the BUILD MODE post-change symbol-loss gate and Audit on the fix diff (`references/build-mode.md`, Step 2.1 + Step 3a–3g) — a fix is a code change like any other. The final fix report closes with the cockpit verdict block (build-mode 3e shapes) — root cause and evidence prose come BEFORE the block, the block is the last word.
 
 ### Escalation
 
