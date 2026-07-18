@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Code Guardian Skill Installer (v15)
+# Code Guardian Skill Installer (v16)
 # -----------------------------------
 # Installs / updates the code-guardian skill for Claude Code, the bundled
-# llm-council companion, and the four session hooks (prompt-check, audit
-# reminder, DECISION GATE + DEPLOY GATE enforcement) incl. settings.json
-# registration. (The v15 DATA GATE needs no hook — it is enforced via the
-# mandatory Full-Picture block in every data verdict.)
+# llm-council and senior-dev companions, and the four session hooks
+# (prompt-check — v16: fires on every prompt and loads senior-dev first —
+# audit reminder incl. §D heartbeat, DECISION GATE + DEPLOY GATE enforcement)
+# incl. settings.json registration.
 # Works on macOS and Linux.
 #
 # Usage:
@@ -24,6 +24,10 @@ TARGET_DIR="${TARGET_ROOT}/code-guardian"
 # (DEBUG Phase 3, two-failure Escalation, BUILD Pre-Flight 1e Blast-Radius).
 COUNCIL_SOURCE_DIR="${SCRIPT_DIR}/llm-council"
 COUNCIL_TARGET_DIR="${TARGET_ROOT}/llm-council"
+# Bundled companion skill — senior-dev (v16): task intake + persistent senior
+# mindset; loaded first on every prompt by the v16 prompt-check hook.
+SENIOR_SOURCE_DIR="${SCRIPT_DIR}/senior-dev"
+SENIOR_TARGET_DIR="${TARGET_ROOT}/senior-dev"
 # Bundled hooks — make the skill the default in EVERY session (prompt-check,
 # post-edit audit reminder) and enforce the v12 DECISION GATE (AskUserQuestion).
 HOOKS_SOURCE_DIR="${SCRIPT_DIR}/hooks"
@@ -64,6 +68,7 @@ for tool in detect-clones.py detect-config-leaks.sh detect-secrets.sh detect-sym
     [ -f "$SOURCE_DIR/tools/$tool" ] || die "Helper script missing: $SOURCE_DIR/tools/$tool"
 done
 [ -f "$COUNCIL_SOURCE_DIR/SKILL.md" ] || die "Bundled companion missing: $COUNCIL_SOURCE_DIR/SKILL.md"
+[ -f "$SENIOR_SOURCE_DIR/SKILL.md" ] || die "Bundled companion missing: $SENIOR_SOURCE_DIR/SKILL.md"
 for hook in code-guardian-prompt-check.sh code-guardian-reminder.sh decision-gate-check.sh deploy-gate-check.sh; do
     [ -f "$HOOKS_SOURCE_DIR/$hook" ] || die "Bundled hook missing: $HOOKS_SOURCE_DIR/$hook"
 done
@@ -175,6 +180,26 @@ else
     else
         ok "llm-council would be installed -> $COUNCIL_TARGET_DIR (dry-run)"
     fi
+fi
+
+# Companion skill: senior-dev (bundled, v16). The prompt-check hook instructs
+# every session to load it first; without it installed the instruction dangles.
+log "Companion skill: senior-dev"
+senior_exists=0
+{ [ -d "$SENIOR_TARGET_DIR" ] || [ -L "$SENIOR_TARGET_DIR" ]; } && senior_exists=1
+if [ "$senior_exists" -eq 1 ] && [ "$FORCE" -eq 0 ] && [ "$DRY_RUN" -eq 0 ]; then
+    warn "Existing senior-dev found — updating with bundled copy (companion is versioned with this package)"
+fi
+if [ "$DRY_RUN" -eq 0 ]; then
+    rm -rf "$SENIOR_TARGET_DIR"
+    cp -R "$SENIOR_SOURCE_DIR" "$SENIOR_TARGET_DIR"
+    if grep -q "name: senior-dev" "$SENIOR_TARGET_DIR/SKILL.md" 2>/dev/null; then
+        ok "senior-dev installed -> $SENIOR_TARGET_DIR (intake gate operational)"
+    else
+        die "senior-dev verification failed: marker 'name: senior-dev' not found in $SENIOR_TARGET_DIR/SKILL.md"
+    fi
+else
+    ok "senior-dev would be installed -> $SENIOR_TARGET_DIR (dry-run)"
 fi
 
 # Hooks: copy scripts + register them in ~/.claude/settings.json (idempotent merge).
