@@ -126,10 +126,11 @@ if [ "$DRY_RUN" -eq 0 ]; then
     fi
 fi
 
-# Version check — confirm v15 structural markers + shipped features are present
+# Version check — confirm v16 structural markers + shipped features are present
 if [ "$DRY_RUN" -eq 0 ]; then
     missing=()
-    grep -q "Code Guardian (v15)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v15)")
+    grep -q "Code Guardian (v16)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v16)")
+    grep -q "senior-dev"                       "$TARGET_DIR/SKILL.md" || missing+=("senior-dev upstream reference")
     grep -q "DATA GATE"                        "$TARGET_DIR/SKILL.md" || missing+=("DATA GATE")
     [ -f "$TARGET_DIR/references/data-gate.md" ] || missing+=("references/data-gate.md")
     grep -q "DEPLOY GATE"                      "$TARGET_DIR/SKILL.md" || missing+=("DEPLOY GATE")
@@ -147,7 +148,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
     [ -f "$TARGET_DIR/tools/detect-hardcoded-cases.py" ] || missing+=("tools/detect-hardcoded-cases.py")
     [ -f "$TARGET_DIR/tools/detect-deploy-artifacts.py" ] || missing+=("tools/detect-deploy-artifacts.py")
     if [ ${#missing[@]} -eq 0 ]; then
-        ok "v15 markers + symbol-loss + dead-code + decision + generalization + deploy + data gates detected in installed skill"
+        ok "v16 markers + senior-dev anchor + symbol-loss + dead-code + decision + generalization + deploy + data gates detected in installed skill"
     else
         warn "Missing markers: ${missing[*]} — installed version may be outdated"
     fi
