@@ -140,7 +140,7 @@ Trivial-/Normal-Aufgaben durchlaufen die Schleuse bewusst nicht.
 ## Schritt 1 — Installieren (EIN Befehl, macht alles)
 
 ```bash
-unzip code-guardian-v16-update.zip -d code-guardian-v16 && cd code-guardian-v16
+unzip code-guardian-v16.1-update.zip -d code-guardian-v16.1 && cd code-guardian-v16.1
 ./install.sh
 ```
 
