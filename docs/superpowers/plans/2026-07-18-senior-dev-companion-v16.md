@@ -529,7 +529,7 @@ routes here. If no intake ran this session, run senior-dev Stage 0 triage
 before picking a mode.
 ```
 
-- [ ] **Step 2: plan-mode.md.** Directly under the `## Plan Audit (Code Guardian PLAN MODE)` heading, add:
+- [ ] **Step 2: plan-mode.md.** As its own paragraph directly after the intro paragraph ("Bugs that survive the audit…", line 5) and BEFORE P1 — NOT inside the fenced output template at the bottom (its `## Plan Audit` line is template text, not a section heading) — add:
 
 ```markdown
 Senior view first: re-read senior-dev `references/senior-card.md` §B and

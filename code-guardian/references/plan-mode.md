@@ -4,6 +4,8 @@
 
 Bugs that survive the audit usually originated in the plan. Run these 7 reflexes against any spec/plan before implementation is dispatched — and again when receiving a plan from another author. Run them, record PASS/FAIL with proof, move on (Principle 2).
 
+Senior view first: re-read senior-dev `references/senior-card.md` §B and answer its architecture questions against this plan before auditing (right problem? already exists? simplest design? trade-offs named? DB normalized?).
+
 **P1. Cross-Layer Trace for Every New Field.** Walk each new field end-to-end: DB column → model allowlist/visibility → serializer/response builder → transport payload → client template. A model-layer allowlist does NOT guarantee client delivery — if the serializer uses an explicit key whitelist, an absent field is dropped silently. *Check:* grep the response builders for explicit key lists; if any exist, the plan must include the serializer change.
 
 **P2. Scale Verification for DB Iteration.** Every row-iterating command/job names its streaming method by expected count: `<1000` → `->get()` · `1k–100k` → `->cursor()`/`->lazy(N)` · `100k+` → `->lazyById(N)` + job queue. Gotchas: some streaming primitives silently re-drive the query and ignore an upstream `LIMIT` — if you need streaming AND a cap, verify the actual processed row count. Aggregates (`SUM/COUNT/AVG/MAX/MIN`) scan rows: verify with `EXPLAIN` that an index is used and the row estimate is bounded; consider a denormalized counter for hot paths.
@@ -22,9 +24,6 @@ Bugs that survive the audit usually originated in the plan. Run these 7 reflexes
 
 ```markdown
 ## Plan Audit (Code Guardian PLAN MODE)
-Senior view first: re-read senior-dev `references/senior-card.md` §B and
-answer its architecture questions against this plan before auditing (right
-problem? already exists? simplest design? trade-offs named? DB normalized?).
 P1 Cross-Layer Trace: PASS/FAIL — Verified-by: <grep output>
 P2 Scale Verification: PASS/FAIL — Verified-by: <row count + method>
 P3 Secrets Hygiene: PASS/FAIL — Verified-by: <grep for ?key=>
