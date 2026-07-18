@@ -1,4 +1,4 @@
-# Code Guardian v16 — Update-Anleitung
+# Code Guardian v16.1 — Update-Anleitung
 
 Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v16**,
 installiert die gebündelten Companion-Skills **llm-council** und **senior-dev**

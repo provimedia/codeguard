@@ -170,3 +170,19 @@ additionally rotates through the §D questions (counter in
    after install.sh.
 
 Done = the skill demonstrably does in live sessions what this spec describes.
+
+## Addendum v16.1 (2026-07-19, post-monitoring)
+
+Two design changes after live monitoring, both already shipped:
+
+1. **Tag law (fix from monitoring S6a/b):** journal type-tags name the task
+   TYPE, never the instance (`api-endpoint`, not `stats-endpoint`); exactly ONE
+   journal line per task; recurrence is counted by TYPE across older narrower
+   tags. Without this, sessions invent instance tags and Rule of Three never
+   fires (observed live, fixed, re-verified in S6c).
+2. **Plan-Mode airlock (CEO request):** triage class large/unclear/risky calls
+   `EnterPlanMode` before ANY analysis — the whole §A/§B/planning phase runs
+   hard read-only; `ExitPlanMode` presents the plan as the approval artifact,
+   building starts only after the developer's approval. Headless fallback:
+   same discipline by hand (read-only, present plan, stop). Trivial/normal
+   never enter the airlock.

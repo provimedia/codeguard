@@ -11,3 +11,4 @@ __pycache__/
 
 # DEPLOY GATE report — ephemeral working data (v14)
 .code-guardian-deploy-report.md
+.task-journal.md
