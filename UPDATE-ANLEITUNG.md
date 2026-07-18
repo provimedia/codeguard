@@ -129,6 +129,14 @@ Senior-Mindset.
   anders als `llm-council` (nur installiert, wenn noch keiner vorhanden ist)
   wird `senior-dev` bei jedem Update immer mit dem Paket aktualisiert.
 
+### v16.1 — Plan-Mode-Schleuse
+
+Bei Triage-Klasse **large/unclear/risky** ruft `senior-dev` vor jeder Analyse
+`EnterPlanMode` auf: Die komplette Analyse- und Planungsphase läuft hart
+read-only (das Harness blockiert Edits), `ExitPlanMode` legt den fertigen Plan
+zur Freigabe vor — gebaut wird erst nach dem Freigabe-Klick des Entwicklers.
+Trivial-/Normal-Aufgaben durchlaufen die Schleuse bewusst nicht.
+
 ## Schritt 1 — Installieren (EIN Befehl, macht alles)
 
 ```bash
@@ -211,4 +219,4 @@ Der Installer prüft die v16-Marker selbst und meldet
 - Hooks/Settings: `~/.claude/settings.json.backup-code-guardian.<timestamp>`
   zurückkopieren; Hook-Skripte in `~/.claude/hooks/` ggf. löschen.
 
-Stand: 18.07.2026 (v16) · Fragen an Alex
+Stand: 19.07.2026 (v16.1) · Fragen an Alex
