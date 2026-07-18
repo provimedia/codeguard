@@ -1,11 +1,12 @@
-# Code Guardian v16.1 — Update-Anleitung
+# Code Guardian v16.2 — Update-Anleitung
 
-Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v16**,
+Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v16.2**,
 installiert die gebündelten Companion-Skills **llm-council** und **senior-dev**
 mit und richtet die **Hooks automatisch** ein — inklusive DECISION GATE und
-DEPLOY GATE. Neu in v16: der **Senior Dev Companion** (`senior-dev`) — er lädt
-bei jeder Eingabe zuerst und sorgt für Task-Intake plus einen durchgehenden
-Senior-Mindset.
+DEPLOY GATE. Neu in v16.2: das **Cockpit** (`references/output-style.md`) — eine
+kanonische Visual-Output-Schicht, die Reports, Tracker und Verdicts an
+Phasengrenzen als schlanke Terminal-Frames rendert; die Prosa wird ersetzt,
+nicht verdoppelt.
 
 ## Was ist neu seit v10
 
@@ -137,10 +138,35 @@ read-only (das Harness blockiert Edits), `ExitPlanMode` legt den fertigen Plan
 zur Freigabe vor — gebaut wird erst nach dem Freigabe-Klick des Entwicklers.
 Trivial-/Normal-Aufgaben durchlaufen die Schleuse bewusst nicht.
 
+### v16.2 — Cockpit Edition
+
+- **Das Phasen-Cockpit:** Neue kanonische Visual-Output-Schicht
+  `references/output-style.md`. Modi und Gates rendern ihre Reports, Tracker
+  und Verdicts nicht mehr als reine Prosa, sondern als schlanke Terminal-Frames
+  — und zwar NUR an Phasengrenzen (Intake, Mode-Einstieg, Step-Abschluss,
+  Verdikt), nie nach jedem Tool-Call.
+- **Intake-Karte:** `senior-dev` kündigt jede Aufgabe ab Klasse „normal" als
+  Karte an (Klasse · Route · Tag · Beweisplan); Frage/Trivial bleibt bewusst
+  eine schlichte Zeile.
+- **Mode-Banner & Checklisten-Tracker:** Jeder Mode-Einstieg bekommt eine
+  Ein-Zeilen-Bannerzeile; Pre-Flight (1a–1e), Audit-Layer, PLAN P1–P7 und die
+  5 DEBUG-Phasen laufen als Checklisten-Tracker mit **20-Zellen-Progressbars**
+  (`█`/`░`).
+- **Ampel-Verdict-Blöcke:** Audit-Ende und jedes Gate-Verdikt erscheinen als
+  Verdict-Block — eine Ampelzeile (🟢🟡🔴) je Layer mit komprimiertem
+  Verified-by, darunter die verbindliche Verdikt-Zeile.
+- **Visuals ersetzen Prosa, verdoppeln sie nie.** Alle inhaltlich bindenden
+  Regeln (Verified-by-Belege, Vollbild-Felder, verbotene Phrasen,
+  Verdikt-Definitionen, das „(Empfohlen)"-Format) bleiben Wort für Wort
+  unverändert — das Cockpit ändert nur die DARSTELLUNG.
+- **Kein ANSI:** Chat-Output läuft durch einen Markdown-Renderer, deshalb keine
+  Escape-Codes — Farbe kommt aus Ampel-Emojis, Struktur aus `━`-Linien und
+  `█`/`░`-Balken. Offene `━`-Rahmen statt geschlossener Kästen.
+
 ## Schritt 1 — Installieren (EIN Befehl, macht alles)
 
 ```bash
-unzip code-guardian-v16.1-update.zip -d code-guardian-v16.1 && cd code-guardian-v16.1
+unzip code-guardian-v16.2-update.zip -d code-guardian-v16.2 && cd code-guardian-v16.2
 ./install.sh
 ```
 
@@ -219,4 +245,4 @@ Der Installer prüft die v16-Marker selbst und meldet
 - Hooks/Settings: `~/.claude/settings.json.backup-code-guardian.<timestamp>`
   zurückkopieren; Hook-Skripte in `~/.claude/hooks/` ggf. löschen.
 
-Stand: 19.07.2026 (v16.1) · Fragen an Alex
+Stand: 19.07.2026 (v16.2) · Fragen an Alex
