@@ -48,10 +48,18 @@ Never downgrade mid-task. State your class in one line before starting
 8. Route: bug/error → code-guardian DEBUG MODE · spec/plan → PLAN MODE ·
    build/change → BUILD MODE (+ superpowers TDD).
 
-Then append one line to `.task-journal.md` (create the file if missing):
+Then append EXACTLY ONE line to `.task-journal.md` (create the file if
+missing) — never a second line for the same task on completion; lessons go
+to `.audit-log.md` (§E):
 `YYYY-MM-DD | <type-tag> | <triage-class> | <one-line goal>`
-Type-tags are free-form but STABLE across entries (`csv-import`,
-`seo-fix`, `blog-article` — same task type, same tag).
+
+Tag law — the tag names the task TYPE, never the instance. The type is the
+repeatable shape you would build a skill for: `api-endpoint`, not
+`stats-endpoint`; `blog-article`, not `seo-teaser-april`. Before inventing a
+new tag, READ the existing tags and reuse the one that covers this type; a
+new tag is allowed only when no existing tag fits. When counting recurrence,
+count by TYPE — older same-type entries under a narrower tag still count as
+occurrences.
 
 ## The skill proposal (Rule of Three)
 
