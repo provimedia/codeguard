@@ -1,8 +1,9 @@
-# Code Guardian v14 — Update-Anleitung
+# Code Guardian v15 — Update-Anleitung
 
-Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v14**,
+Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v15**,
 installiert den gebündelten **llm-council**-Companion mit und richtet die
-**Hooks automatisch** ein — inklusive DECISION GATE und DEPLOY GATE.
+**Hooks automatisch** ein — inklusive DECISION GATE und DEPLOY GATE. Neu in
+v15: das **DATA GATE** (Vollbild-Pflicht vor jedem Daten-Verdikt).
 
 ## Was ist neu seit v10
 
@@ -71,10 +72,37 @@ installiert den gebündelten **llm-council**-Companion mit und richtet die
   existiert. rsync `--dry-run`, lokales rsync und git push auf normale
   Remotes bleiben frei.
 
+### v15 — Data Gate (Vollbild vor Daten-Verdikten)
+
+- **Kein Daten-Verdikt mehr aus dem Teilbild:** Bevor Claude Datensätze als
+  „verwaist / hängen geblieben / nie bearbeitet / inkonsistent" einstuft — oder
+  auf Basis interpretierter DB-Daten fixt, migriert, bereinigt oder berichtet —
+  MUSS das Vollbild stehen: **V1** Live-Schema-Inventar JEDER beteiligten
+  Tabelle (Introspection, nie Doku/Gedächtnis) plus ein FK-Hop (Historie-/Log-/
+  Queue-/Schedule-Tabellen), alle zustandstragenden Spalten markiert
+  (Aufschub-Daten wie `deadline_ab`/`freigabe_ab`, Gültigkeitsfenster, Flags,
+  Soft-Delete) · **V2** `SELECT *` auf die konkreten Zeilen (nie eine
+  handverlesene Spaltenliste) + Vergleich mit einer gesunden Geschwister-Zeile ·
+  **V3** das ECHTE Prädikat des Verarbeiters (Cron/Job/Trigger) gegen die
+  Zeilen testen — ein vorgegebenes Kriterium (Ticket, Meeting, veraltete Doku)
+  ist Hypothese, nie Prädikat · **V4** die harmlose Erklärung („legitimer
+  Wartezustand") ist IMMER Kandidat und stirbt nur durch Beleg.
+- **Anlass:** echter Fehlbefund — Aufträge wurden als „verwaist" gemeldet, weil
+  die Wartespalte `deadline_ab` dem Analysten unbekannt war. Das Gesetz:
+  **Abwesenheit von Aktivität beweist nie kaputte Daten.**
+- **Verbindlicher Output:** Jedes Daten-Verdikt trägt den „Vollbild-Block"
+  (geprüfte Tabellen · ausgeschlossene Zustandsspalten · gedumpte Zeilen ·
+  getestetes Prädikat · Verdikt `DEFECT | INTENDED STATE | MIXED |
+  INSUFFICIENT PICTURE`). Ohne Block ist das Verdikt nicht berichtsfähig;
+  ohne Bild heißt es ehrlich `INSUFFICIENT PICTURE` statt raten.
+- Neu: `references/data-gate.md`; DEBUG MODE verdrahtet (Phase 1e +
+  Pflicht-Kandidat in Phase 2). **Kein neuer Hook** — ein Verdikt ist Prosa,
+  kein Tool-Call; der Pflicht-Block selbst ist die Durchsetzung.
+
 ## Schritt 1 — Installieren (EIN Befehl, macht alles)
 
 ```bash
-unzip code-guardian-v14-update.zip -d code-guardian-v14 && cd code-guardian-v14
+unzip code-guardian-v15-update.zip -d code-guardian-v15 && cd code-guardian-v15
 ./install.sh
 ```
 
@@ -82,7 +110,7 @@ Der Installer erledigt jetzt ALLES selbst:
 
 1. Backup der bestehenden Skill-Installation nach
    `~/.claude/skill-backups/code-guardian.backup.<timestamp>/`
-2. Skill v14 nach `~/.claude/skills/code-guardian/`
+2. Skill v15 nach `~/.claude/skills/code-guardian/`
 3. `llm-council` nach `~/.claude/skills/llm-council/` (nur falls fehlt)
 4. Die 4 Hooks nach `~/.claude/hooks/` (werden bei Updates überschrieben):
    - `code-guardian-prompt-check.sh` — Skill-Reminder bei Code-/Bug-Prompts
@@ -117,8 +145,9 @@ Unter `/hooks` müssen erscheinen:
 ## Schritt 3 — Verifizieren
 
 ```bash
-grep -m1 "Code Guardian (v14)" ~/.claude/skills/code-guardian/SKILL.md   # → Treffer
-ls ~/.claude/skills/code-guardian/references/   # → 10 .md-Dateien (inkl. deploy-gate.md)
+grep -m1 "Code Guardian (v15)" ~/.claude/skills/code-guardian/SKILL.md   # → Treffer
+grep -m1 "DATA GATE" ~/.claude/skills/code-guardian/SKILL.md             # → Treffer
+ls ~/.claude/skills/code-guardian/references/   # → 11 .md-Dateien (inkl. data-gate.md)
 ls ~/.claude/skills/code-guardian/tools/        # → 7 Skripte (inkl. detect-deploy-artifacts.py)
 ls ~/.claude/skills/llm-council/SKILL.md        # → vorhanden
 ls -l ~/.claude/hooks/deploy-gate-check.sh      # → -rwxr-xr-x
@@ -132,8 +161,8 @@ echo '{"tool_input":{"command":"rsync -avz ./ user@server.de:/var/www/html/"}}' 
   | ~/.claude/hooks/deploy-gate-check.sh
 ```
 
-Der Installer prüft die v14-Marker selbst und meldet
-`v14 markers + symbol-loss + dead-code + decision + generalization + deploy gates detected`.
+Der Installer prüft die v15-Marker selbst und meldet
+`v15 markers + symbol-loss + dead-code + decision + generalization + deploy + data gates detected`.
 
 ## Voraussetzungen
 
@@ -149,4 +178,4 @@ Der Installer prüft die v14-Marker selbst und meldet
 - Hooks/Settings: `~/.claude/settings.json.backup-code-guardian.<timestamp>`
   zurückkopieren; Hook-Skripte in `~/.claude/hooks/` ggf. löschen.
 
-Stand: 08.07.2026 (v14) · Fragen an Alex
+Stand: 18.07.2026 (v15) · Fragen an Alex

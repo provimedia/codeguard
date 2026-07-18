@@ -2,7 +2,7 @@
 
 A mandatory audit skill for [Claude Code](https://claude.com/claude-code) that prevents bugs by enforcing plan-time, build-time, and debug-time reflexes. Born from real bugs that escaped audits in production — every rule is backed by a concrete incident citation in `SKILL.md`.
 
-- **Version:** v13 (Generalization Edition)
+- **Version:** v15 (Data Gate Edition)
 - **Platform:** macOS / Linux
 - **Languages:** English + German trigger phrases
 
@@ -111,6 +111,17 @@ Nothing reaches an external server unclassified. The second orthogonal gate (v12
 
 Validated against `test/deploy/`: every planted trap flagged in `--root` and `--list` mode, 0 false positives on clean app files; hook matrix 6 deny / 5 allow + 4 freshness cases.
 
+### Data Gate (v15)
+
+No verdict about the state of data from a partial picture. The third orthogonal gate fires in ANY mode — and in pure analysis tasks with no code change — the moment the agent is about to declare records **orphaned / stuck / unprocessed / inconsistent** ("verwaist", "hängen geblieben", "nie bearbeitet") or to base a fix, migration, cleanup list, or report on interpreted DB data. Born from a real misdiagnosis: orders were declared "verwaist" because the analyst did not know the wait-state column (`deadline_ab`) existed — the orders were legitimately deferred, not broken.
+
+- **The law:** *a verdict about data is a verdict about the whole schema* — and the data sibling of the v11 liveness law: **absence of activity never proves broken data.** A handed-down criterion (ticket, meeting note, stale schema doc) is a hypothesis, never the predicate.
+- **V1 Schema inventory (live):** full column list of EVERY involved table via live introspection (never docs/memory/ORM) + one FK hop (related, history, log, queue, schedule tables); mark all state-carrying columns (status/enums, `*_at`, window/deferral columns like `*_ab`/`*_from`/`*_until`/`deadline*`, hold/pause/archive flags, soft-delete, retry counters).
+- **V2 Row reality:** `SELECT *` on the concrete rows — never a hand-picked column list (the unknown-unknown column is invisible by construction); compare a healthy sibling row when one exists.
+- **V3 Processor cross-check:** locate the cron/job/trigger that should act on the rows, extract its REAL predicate (follow query builders), test which condition excludes them.
+- **V4 Innocent-explanation elimination:** "legitimate intended state (waiting/deferred/paused/gated)" is always a candidate and dies only by evidence, never by "I didn't see anything".
+- **Binding output:** every data verdict carries the **Full-Picture block** (tables inspected · state columns ruled out · rows dumped · predicate tested · verdict `DEFECT | INTENDED STATE | MIXED | INSUFFICIENT PICTURE`). No block → not reportable; no picture → `INSUFFICIENT PICTURE`, never a guess. No hook — a verdict is prose, not a tool call; the required block is the enforcement. Full protocol: `code-guardian/references/data-gate.md`.
+
 ---
 
 ## Repository Layout
@@ -126,7 +137,9 @@ Validated against `test/deploy/`: every planted trap flagged in `--root` and `--
 │   ├── decision-gate-check.sh         ← PreToolUse (AskUserQuestion): v12 DECISION GATE enforcement
 │   └── deploy-gate-check.sh           ← PreToolUse (Bash): v14 DEPLOY GATE enforcement
 ├── code-guardian/
-│   ├── SKILL.md                   ← the skill definition (~1110 lines)
+│   ├── SKILL.md                   ← the skill router (Operating Principles, mode/gate skeletons)
+│   ├── references/                ← per-mode/per-gate full protocols (plan/build/debug/cleanup,
+│   │                                 decision-gate, deploy-gate, data-gate, cross-layer, rationale)
 │   └── tools/
 │       ├── detect-secrets.sh      ← R1 hardcoded-secret scanner
 │       ├── detect-clones.py       ← R2/R3/R5 cross-file clone detector (Rule-of-Three guard)
@@ -157,7 +170,7 @@ The installer will:
 - Back up any existing `code-guardian` install to `~/.claude/skills/code-guardian.backup.YYYYMMDD-HHMMSS`
 - Copy `SKILL.md` and `tools/` into `~/.claude/skills/code-guardian/`
 - Set executable bits on the helper scripts
-- Verify that the version markers are present (v12: `Code Guardian (v12)`, `DECISION GATE`, …)
+- Verify that the version markers are present (v15: `Code Guardian (v15)`, `DATA GATE`, `DEPLOY GATE`, …)
 - Install the bundled `llm-council` companion into `~/.claude/skills/llm-council/` **only if it is not already present** (an existing council is left untouched unless `--force` is passed)
 - Install the three bundled hooks into `~/.claude/hooks/` and **register them in `~/.claude/settings.json` automatically** — idempotent merge with a timestamped backup; existing entries and all other keys are left untouched. Corrupt JSON or missing `python3` → the file is never touched, manual instructions are printed instead.
 - Print next steps — **restart Claude Code afterwards**: hooks are read at session start (`/hooks` to verify)
@@ -183,11 +196,10 @@ The installer will:
 3. Confirm all version markers are loaded:
 
    ```bash
-   grep -E "PLAN MODE \(v5|v6 Redundancy Rules|v7 Council Rules|v7\.1 Proactive Council Rules" \
-       ~/.claude/skills/code-guardian/SKILL.md
+   grep -cE "Code Guardian \(v15\)|DATA GATE|DEPLOY GATE|DECISION GATE|CLEANUP MODE" \
+       ~/.claude/skills/code-guardian/SKILL.md    # → > 0 matches per marker
+   ls ~/.claude/skills/code-guardian/references/  # → 11 .md files (incl. data-gate.md)
    ```
-
-   Should return **4 matches**.
 
 4. Confirm the helper scripts are executable:
 
@@ -195,7 +207,7 @@ The installer will:
    ls -l ~/.claude/skills/code-guardian/tools/
    ```
 
-   All three files should be `-rwxr-xr-x`.
+   All seven scripts should be `-rwxr-xr-x`.
 
 ---
 
@@ -287,6 +299,7 @@ Deterministic enforcement of the DEPLOY GATE: a `PreToolUse` hook on **Bash** th
 
 ## Version History
 
+- **v15** (2026-07) — Data Gate. Third orthogonal gate: no data-state verdict ("verwaist", "stuck", "nie bearbeitet") and no data-based fix/migration/cleanup/report without the full live picture. V1 live schema inventory of every involved table + one FK hop (state-carrying columns: deferral dates, validity windows, flags, soft-delete) · V2 `SELECT *` row reality with healthy-sibling diff · V3 processor-predicate cross-check (handed-down criteria are hypotheses) · V4 innocent-explanation elimination with evidence. Binding Full-Picture block on every data verdict incl. honest `INSUFFICIENT PICTURE`; the law: absence of activity never proves broken data (liveness asymmetry applied to data). New `references/data-gate.md`, DEBUG MODE wiring (Phase 1e + mandatory Phase-2 candidate). Born from a real `deadline_ab` misdiagnosis; validated via TDD fixture scenarios (bug-shaped + analysis-shaped with authority-supplied wrong criterion). No hook — verdicts are prose; the required block is the enforcement.
 - **v14** (2026-07) — Deploy Gate. Second orthogonal gate: no file reaches an external server unclassified. 4-class law (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER[high|low] / REVIEW; transfer and existence are independent dimensions), D1 manifest check on the real transfer list, D2 durable committed excludes, D3 server retro-check (HTTP probes + SSH find; SERVER-ONLY reachable over HTTP = webserver fix, never deletion), D4 leftover removal only after ONE user approval with re-probe verification. New `references/deploy-gate.md`, report-only classifier `tools/detect-deploy-artifacts.py` (data-table catalogs, `.code-guardian-deploy.yml` overrides), fourth hook `deploy-gate-check.sh` (PreToolUse on Bash, dry-run/local/non-prod carve-outs). Validated against `test/deploy/` + 15-case hook matrix.
 - **v13** (2026-07) — Generalization Gate. The examples-are-data law (no example literal from a universally-quantified requirement in `if`/`switch`/regex/lookup control flow), deletion + second-example tests, PLAN reflex P7, Logic-layer + Self-Slop integration, and the report-only detector `tools/detect-hardcoded-cases.py` (decision-context heuristic, `--examples`, `--git` diff mode, `INTENTIONAL-SPECIAL-CASE` escape hatch). Validated against `test/hardcoding/`: 9/9 traps flagged, 0 false positives on clean cases.
 - **v12** (2026-07) — Decision Gate. Orthogonal gate that fires before ANY option question to the user: tiered max-think (T1 rubric always · T2 parallel advocates on material divergence · T3 bundled `llm-council` on irreversible/≥5-consumer/foundation decisions), binding "(Empfohlen)"-first output format, explicit prohibition of autonomous deciding — the gate recommends, the user decides. New `references/decision-gate.md`; optional deterministic `PreToolUse` hook on `AskUserQuestion` (denies unrecommended option questions; deny reason self-corrects the model). `llm-council` companion now bundled in-repo and auto-installed by `install.sh` (install-only-if-missing).

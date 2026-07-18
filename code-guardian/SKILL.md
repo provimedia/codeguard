@@ -23,13 +23,18 @@ description: >
   leftovers (tests, docs, dumps) sit on the server. Classify EVERY file before transfer
   (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER / REVIEW); leftovers found server-side are reported
   and removed only after user approval.
+  Use when (DATA GATE): about to declare a verdict about the STATE of data — records look
+  orphaned, stuck, stale, unprocessed, lost, inconsistent, duplicate, "verwaist", "hängen
+  geblieben", "nie bearbeitet", "Datenleiche" — or about to base a fix/migration/cleanup/
+  report on interpreted DB data. Full live-schema picture of every involved table first;
+  absence of activity never proves broken data.
   ANTI-RATIONALIZATION: If you think "this is too small to need an audit" — that IS the trigger.
   If you think "I already understand this" — that IS the trigger.
   If you think "the user is waiting, just do it quickly" — that IS the trigger.
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v14)
+# Code Guardian (v15)
 
 ## Operating Principles
 
@@ -56,7 +61,7 @@ Task received
 
 Each mode is **mutually exclusive** — the full protocol lives in a per-mode reference file. Read ONLY the selected mode's file; that keeps this always-loaded body small (progressive disclosure). The skeleton below is the router, not the whole procedure — **load the mode file before acting.**
 
-Two gates are orthogonal to mode selection and fire in ANY mode (and outside them): the **DECISION GATE** the moment an option question is about to go to the user, and the **DEPLOY GATE** the moment a deployment/transfer to an external server is about to run.
+Three gates are orthogonal to mode selection and fire in ANY mode (and outside them): the **DECISION GATE** the moment an option question is about to go to the user, the **DEPLOY GATE** the moment a deployment/transfer to an external server is about to run, and the **DATA GATE** the moment a verdict about the state of data — or an action based on interpreted DB data — is about to be formed.
 
 ## Reference Files (progressive disclosure)
 
@@ -70,6 +75,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | `references/cleanup-mode.md` | opt-in report-only dead/orphaned/redundant-code protocol: liveness-veto gate, framework FP-category gate, per-language detectors, redundancy counter-rule | CLEANUP MODE selected (explicit cleanup request only) |
 | `references/decision-gate.md` | T1 rubric matrix, T2 advocate / T3 council escalation triggers, binding "(Empfohlen)" output template | DECISION GATE fires (an option question is about to go to the user) |
 | `references/deploy-gate.md` | 4-class law (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER / REVIEW), D1 manifest check, D2 durable excludes, D3 server retro-check, D4 approved removal, report artifact + `.code-guardian-deploy.yml` | DEPLOY GATE fires (a deploy/transfer to an external server is about to run, or server hygiene is questioned) |
+| `references/data-gate.md` | full-picture law, V1 live schema inventory · V2 `SELECT *` row reality · V3 processor predicate cross-check · V4 innocent-explanation elimination, Full-Picture block template | DATA GATE fires (a data-state verdict or data-based fix/migration/cleanup/report is about to be formed) |
 | `references/generalization-gate.md` | the examples-are-data law, deletion + second-example tests, `detect-hardcoded-cases.py` usage, INTENTIONAL-SPECIAL-CASE marker | PLAN P7 runs, or the audit/Self-Slop flags a hardcoded example |
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |
 | `references/audit-deep-checks.md` | Full-depth layer checks (DB, Logic, Efficiency, Security) + R1–R5 redundancy detectors in detail | any audit layer runs at full depth |
@@ -164,6 +170,20 @@ Full protocol, probe tables, config reference: `references/deploy-gate.md`.
 
 ---
 
+## DATA GATE
+
+About to declare a verdict about the state of data (records look orphaned/stuck/unprocessed/inconsistent — "verwaist", "hängen geblieben", "nie bearbeitet") or to base a fix/migration/cleanup/report on interpreted DB data → **Read `references/data-gate.md`** and run the gate BEFORE the verdict leaves you. A verdict about data is a verdict about the whole schema.
+
+- **V1 Schema inventory (live):** full column list of EVERY involved table via live introspection (never docs/memory/ORM — they age) + one FK hop (related, history, log, queue, schedule tables). Mark all state-carrying columns: status/enums, `*_at` timestamps, window/deferral columns (`*_ab`, `*_from`, `*_until`, `deadline*`, `valid*`), hold/pause/archive flags, soft-delete, retry counters.
+- **V2 Row reality:** `SELECT *` on the concrete entities — never a hand-picked column list; the unknown-unknown column is only visible in the full row. Compare a healthy sibling row when one exists.
+- **V3 Processor cross-check:** locate the code/cron/trigger that should act on the rows, extract its REAL predicate, and test which condition excludes them. A handed-down criterion (ticket, meeting note, stale doc) is a hypothesis, never the predicate.
+- **V4 Innocent explanation:** "legitimate intended state (waiting/deferred/paused/gated)" is ALWAYS a candidate and is eliminated only with evidence — absence of activity never proves broken data.
+- **Output (binding):** every data verdict carries the Full-Picture block (tables inspected · state columns ruled out · rows dumped · predicate tested · verdict `DEFECT | INTENDED STATE | MIXED | INSUFFICIENT PICTURE`). No block → not reportable; no picture → `INSUFFICIENT PICTURE`, never a guess.
+
+Full law, checks, block template, anti-rationalization table: `references/data-gate.md`.
+
+---
+
 ## Self-Tuning
 
 When reading `.audit-log.md` at audit start:
@@ -181,5 +201,6 @@ When reading `.audit-log.md` at audit start:
 - **Duplication is cheaper than the wrong abstraction.** Never extract a shared abstraction to kill duplication unless ≥3 sites (Rule of Three) AND they encode the same knowledge (one reason to change). Cleaning slop must not create slop.
 - **The gate recommends; the user decides.** No option question to the user without a "(Empfohlen)" recommendation (DECISION GATE) — and never decide autonomously what the user reserved for themselves.
 - **Nothing reaches a server unclassified.** Every deploy passes the DEPLOY GATE: classify the full transfer list (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER / REVIEW). NEVER artifacts (tests, docs, dumps, audit logs, VCS/IDE files) are excluded durably in the deploy mechanism and removed from the server only after user approval; SERVER-ONLY files (prod `.env`, `storage/`, uploads) are never transferred AND never deleted. Detector: `tools/detect-deploy-artifacts.py` (`references/deploy-gate.md`).
+- **A verdict about data is a verdict about the whole schema.** Before declaring records orphaned/stuck/broken — or repairing/migrating/deleting on that basis — pass the DATA GATE: live-introspect EVERY involved table + one FK hop, enumerate state-carrying columns (deferral dates, validity windows, flags, soft-delete), `SELECT *` the concrete rows, test the real processor predicate, and eliminate the innocent explanation with evidence. Absence of activity never proves broken data (`references/data-gate.md`).
 - **An example in the requirement is DATA, never CODE.** Universal requirement ("every industry", "any domain") → no example literal in `if`/`switch`/regex/lookup control flow; build the generic mechanism (classifier/parser/DB/AI), keep concrete values in config/tests. Honest single-value business rules need an `INTENTIONAL-SPECIAL-CASE:` marker with a real reason. Detector: `tools/detect-hardcoded-cases.py` (`references/generalization-gate.md`).
 - Version history and gate rationale: `references/design-rationale.md` (load only when editing this skill).

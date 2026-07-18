@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
-# Code Guardian Skill Installer (v14)
+# Code Guardian Skill Installer (v15)
 # -----------------------------------
 # Installs / updates the code-guardian skill for Claude Code, the bundled
 # llm-council companion, and the four session hooks (prompt-check, audit
 # reminder, DECISION GATE + DEPLOY GATE enforcement) incl. settings.json
-# registration.
+# registration. (The v15 DATA GATE needs no hook — it is enforced via the
+# mandatory Full-Picture block in every data verdict.)
 # Works on macOS and Linux.
 #
 # Usage:
@@ -120,10 +121,12 @@ if [ "$DRY_RUN" -eq 0 ]; then
     fi
 fi
 
-# Version check — confirm v13 structural markers + shipped features are present
+# Version check — confirm v15 structural markers + shipped features are present
 if [ "$DRY_RUN" -eq 0 ]; then
     missing=()
-    grep -q "Code Guardian (v14)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v14)")
+    grep -q "Code Guardian (v15)"              "$TARGET_DIR/SKILL.md" || missing+=("Code Guardian (v15)")
+    grep -q "DATA GATE"                        "$TARGET_DIR/SKILL.md" || missing+=("DATA GATE")
+    [ -f "$TARGET_DIR/references/data-gate.md" ] || missing+=("references/data-gate.md")
     grep -q "DEPLOY GATE"                      "$TARGET_DIR/SKILL.md" || missing+=("DEPLOY GATE")
     grep -q "PLAN MODE"                        "$TARGET_DIR/SKILL.md" || missing+=("PLAN MODE")
     grep -q "BUILD MODE"                       "$TARGET_DIR/SKILL.md" || missing+=("BUILD MODE")
@@ -139,7 +142,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
     [ -f "$TARGET_DIR/tools/detect-hardcoded-cases.py" ] || missing+=("tools/detect-hardcoded-cases.py")
     [ -f "$TARGET_DIR/tools/detect-deploy-artifacts.py" ] || missing+=("tools/detect-deploy-artifacts.py")
     if [ ${#missing[@]} -eq 0 ]; then
-        ok "v14 markers + symbol-loss + dead-code + decision + generalization + deploy gates detected in installed skill"
+        ok "v15 markers + symbol-loss + dead-code + decision + generalization + deploy + data gates detected in installed skill"
     else
         warn "Missing markers: ${missing[*]} — installed version may be outdated"
     fi

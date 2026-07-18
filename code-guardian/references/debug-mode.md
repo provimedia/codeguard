@@ -8,13 +8,14 @@
 - **1b.** What changed recently: `git log --oneline -5 && git diff --name-only HEAD~3`
 - **1c.** Read the entire affected function + 2 levels of callers and callees — not just the error line.
 - **1d. Cross-page dependency trace** — the bug is often not where the error shows. Run the BUILD MODE 1d worklist engine (`references/build-mode.md`, Step 1d) to fixpoint (same QUEUE/VISITED/LEDGER), plus per consumer: was this consumer recently changed? was the function itself? (`git log --oneline -10 -- <file>`). Function changed + consumer not = likely **dependency break** — the most common root cause of "Page B broke after I worked on Page A".
+- **1e. Data-shaped symptom → DATA GATE.** The symptom is about the STATE of data (records look unprocessed, stuck, missing, orphaned, inconsistent, "wrong data") → run the DATA GATE V1–V4 (`references/data-gate.md`) BEFORE Phase 2: live schema inventory of every involved table + one FK hop, `SELECT *` on the concrete rows, processor-predicate cross-check, innocent-explanation candidate. The Full-Picture block feeds the Phase 2 candidate list.
 
 ### Phase 2: ROOT CAUSE (not symptom)
 
 Answer in order — no solutions before question 4:
 1. **WHAT** happens (symptom) · 2. **WHERE** in code (and: is the real cause in a different file?) · 3. **WHEN** introduced (`git log` on the broken function) · 4. **WHY** (root cause) · 5. **WHY wasn't it caught** (missing test, no dependency check).
 
-List 3 candidate causes ranked by probability — always include "dependency break from a recent change in a shared function" when the function has multiple consumers. Verify each by reading code or a targeted test before confirming or ruling out.
+List 3 candidate causes ranked by probability — always include "dependency break from a recent change in a shared function" when the function has multiple consumers, and, for data-shaped symptoms, "legitimate intended state (wait/deferral/hold) defined by a column or related table not yet checked" (DATA GATE V4, `references/data-gate.md`). Verify each by reading code or a targeted test before confirming or ruling out.
 
 ### Phase 3: TWO PATHS
 
