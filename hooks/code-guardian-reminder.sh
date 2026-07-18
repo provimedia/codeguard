@@ -29,7 +29,8 @@ case "$FILE_PATH" in
     esac
 
     # v16 §D heartbeat: every 3rd counted code edit, rotate one senior meta-question
-    SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "nosession"')
+    SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "nosession"' | tr -cd 'A-Za-z0-9._-')
+    [ -z "$SESSION_ID" ] && SESSION_ID="nosession"
     COUNTER_FILE="${TMPDIR:-/tmp}/cg-heartbeat-${SESSION_ID}"
     COUNT=$(( $(cat "$COUNTER_FILE" 2>/dev/null || echo 0) + 1 ))
     echo "$COUNT" > "$COUNTER_FILE"
