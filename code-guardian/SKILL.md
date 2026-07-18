@@ -34,7 +34,7 @@ description: >
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v15)
+# Code Guardian (v16)
 
 ## Operating Principles
 
@@ -47,6 +47,11 @@ Stated once; they govern every mode below. The skill defines goals and gates —
 5. **Write down what you learn.** `.audit-log.md` (findings & patterns), `.code-guardian-propagation.md` (open worklists for large changes). Consult both at the start of a run; keep them current. One lesson per entry, with why it mattered.
 
 ## Mode Selection
+
+Task intake happens upstream in the **senior-dev** companion skill (bundled,
+loaded first on every prompt by the v16 hook): it triages every request and
+routes here. If no intake ran this session, run senior-dev Stage 0 triage
+before picking a mode.
 
 ```
 Task received

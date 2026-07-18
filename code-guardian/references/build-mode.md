@@ -16,6 +16,9 @@ When unsure which row applies, take the deeper one.
 
 ### Step 1: Pre-Flight (before writing code)
 
+Senior view: senior-card §B — right problem, already-exists search, simplest
+design, named trade-offs — before designing the change.
+
 **1a. Scope** — Which tables, functions, files will this change touch?
 
 **1b. Schema Check** — If the change touches the DB, run one consolidated introspection query against the **live** database (adapt credentials per project CLAUDE.md):
@@ -104,6 +107,9 @@ Council verdict (if fired): <Recommendation> — <One Thing to Do First>
 
 ### Step 2: Post-Change Verification — second fixpoint
 
+Senior view: senior-card §C+§D while the diff is open — 6-month test, DRY,
+scope fence, does-this-still-make-sense.
+
 The edits you actually made are new evidence. After writing code:
 
 1. **Symbol-loss gate (mechanical, before you re-seed by hand).** A re-seed driven by reading the diff can skip a symbol you didn't notice you dropped — especially after a full-file `Write` or a large refactor that regenerates a file from memory. Run the detector over the diff first; it reports every function/method/class that disappeared or changed signature, using `git show <ref>:<file>` as the before-image:
@@ -118,6 +124,9 @@ The edits you actually made are new evidence. After writing code:
 A symbol the plan-time LEDGER missed is itself a finding — note why 1d under-scoped it in `.audit-log.md`.
 
 ### Step 3: Audit (after writing code — always)
+
+Senior view: senior-card §E closes the task — self-review as foreign code,
+plain-language explainability, journal the lesson.
 
 > **Verification-not-assertion.** Audit checks are **VERIFIED** by command output, not **ASSERTED** by reading code. Dump the actual serialized response (curl/tinker/Playwright), run the actual grep, hit the actual endpoint. Three standing reflexes:
 > - **A) JSON inspection over code reading** — dump the real payload the consumer receives; prove every consumed key non-null on the bug path. Structural match ("producer returns X, consumer reads X") passes while the runtime payload is `{X: undefined}`.

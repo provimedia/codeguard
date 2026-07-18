@@ -22,6 +22,9 @@ Bugs that survive the audit usually originated in the plan. Run these 7 reflexes
 
 ```markdown
 ## Plan Audit (Code Guardian PLAN MODE)
+Senior view first: re-read senior-dev `references/senior-card.md` §B and
+answer its architecture questions against this plan before auditing (right
+problem? already exists? simplest design? trade-offs named? DB normalized?).
 P1 Cross-Layer Trace: PASS/FAIL — Verified-by: <grep output>
 P2 Scale Verification: PASS/FAIL — Verified-by: <row count + method>
 P3 Secrets Hygiene: PASS/FAIL — Verified-by: <grep for ?key=>

@@ -37,5 +37,8 @@ Never propose just one fix.
 
 ### Escalation
 
+Senior view: this is senior-card §D — two failed attempts means stop, write
+assumptions down, change approach; sunk cost is not a reason to continue.
+
 - **Failed once** → document why, mark the hypothesis disproven, restart Phase 1.
 - **Failed twice** → convene `llm-council` unconditionally before reporting: *"two distinct root-cause fixes failed for <bug> — what is the council missing?"* with both attempts + Phase 2 analysis. New hypothesis → restart Phase 1 with it. Council finds nothing → STOP and report both attempts + analysis + verdict to the user.
