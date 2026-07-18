@@ -213,23 +213,33 @@ Spot-check = scan for obvious violations. Full depth = exhaustive — **load `re
   The second run catches the overfitting anti-pattern in your OWN added lines: an example literal from the requirement sitting in an `if`/`switch`/regex/lookup you just wrote (law + fix direction: `references/generalization-gate.md`). Findings → replace with the generic mechanism; genuine single-value rules get an `INTENTIONAL-SPECIAL-CASE:` marker with the business source.
   Act on each label: **REMOVABLE** (a symbol you added with zero references anywhere) → remove it; **DEBUG-LEFTOVER** (`var_dump`/`dd`/`dump`/`console.log`/`print`/`print_r`, or `TODO`/`FIXME`/`PLACEHOLDER`/`example` you just added) → remove it; **REVIEW** (added, currently unreferenced, but matches a route/handler/command/component entry-point pattern) → keep, it is likely wired up next. The tool catches the **mechanical** slop reliably (unused additions, debug lines). It does NOT catch **semantic** slop — those you remove by reading: a comment that merely restates the next line → delete; a single-use abstraction you just invented (interface/factory/wrapper with exactly one caller) → inline it (YAGNI / Rule of Three); a helper you wrote that duplicates one your 1c.2 pre-flight grep should have found → reuse the existing one (grep the tree for it); any *new* dependency/import → confirm the package actually exists (anti-slopsquatting). This layer removes ONLY your own just-written additions; if a removal would touch anything present before this diff, stop and report instead (that is CLEANUP MODE's job, and it is report-only). **Verified-by**: paste the `--diff-slop` `SUMMARY findings=… exit=…` footer.
 
-**3e. Report.**
-
-Frame both report shapes as a cockpit verdict block (output-style T5) — lamp line per layer with compressed evidence, 20-cell layer bar, then the binding verdict line. Verified-by content and verdict definitions below stay word-for-word.
+**3e. Report.** Render the verdict as a cockpit block (T5 — read
+`references/output-style.md` once per session before the first render).
 
 Clean:
 ```
-✅ [X files | Y lines] clean
-   Verified by: <commands run, e.g. "link-click-test 39/39, payload dump 4 keys non-null, R1–R5 SUMMARY findings=0">
-```
+━━ CODE GUARDIAN · AUDIT-VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🟢 [X files | Y lines] clean — all layers green
+  Layer  ████████████████████  6/6 grün
 
-Findings (only sections with issues):
+  VERDICT: APPROVED (0 critical, 0 warnings)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
-## Audit: [files]
-🔴 [category]: [problem] → [fix]      Verified-by: <command output proving it>
-🟡 [category]: [problem] → [recommendation]   Verified-by: <command output>
-[X] critical | [Y] warnings → APPROVED / NEEDS FIX / BLOCKED
+Directly under the block one line: `Verified by: <commands run, e.g.
+"link-click-test 39/39, payload dump 4 keys non-null, R1–R5 SUMMARY findings=0">`.
+
+Findings (one lamp line per affected layer, compressed evidence in the line):
 ```
+━━ CODE GUARDIAN · AUDIT-VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔴 [category]   [problem] → [fix]
+  🟡 [category]   [problem] → [recommendation]
+  Layer  █████████████░░░░░░░  4/6 grün
+
+  VERDICT: APPROVED / NEEDS FIX / BLOCKED ([X] critical, [Y] warnings)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+Each 🔴/🟡 line's full Verified-by command output follows AFTER the block as
+prose ("Ran X, got Y" with pasted output) — the block compresses, the prose proves.
 
 Forbidden phrases (assertions, not verifications): "I read the controller and the keys match" · "the route ordering looks correct" · "the component should handle this" · "same pattern as before". Required form: "Ran X, got Y" with pasted output · "Grepped for Z, 0 unfixed instances".
 
