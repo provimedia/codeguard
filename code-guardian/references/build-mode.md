@@ -19,6 +19,8 @@ When unsure which row applies, take the deeper one.
 Senior view: senior-card §B — right problem, already-exists search, simplest
 design, named trade-offs — before designing the change.
 
+Cockpit: render the Pre-Flight checklist tracker (output-style T3) when this step starts and when it completes.
+
 **1a. Scope** — Which tables, functions, files will this change touch?
 
 **1b. Schema Check** — If the change touches the DB, run one consolidated introspection query against the **live** database (adapt credentials per project CLAUDE.md):
@@ -94,6 +96,8 @@ SEED  saveUser()                       [Signature: +$role now required]
 └─ database/seeders/UserSeeder          UNAFFECTED → builds via factory
 QUEUE empty → FIXPOINT | PROPAGATES 3 (all planned) · ABSORBS 2 · UNAFFECTED 1
 ```
+
+During long drains, show the worklist pulse (output-style T4) at natural checkpoints — not per consumer.
 
 **Done-ness:** QUEUE empty AND every PROPAGATES node has a planned/applied fix AND no fix introduced a consumer not yet in the LEDGER. When unsure between ABSORBS and PROPAGATES, choose PROPAGATES — under-classifying is what ends the closure one hop short.
 
@@ -210,6 +214,8 @@ Spot-check = scan for obvious violations. Full depth = exhaustive — **load `re
   Act on each label: **REMOVABLE** (a symbol you added with zero references anywhere) → remove it; **DEBUG-LEFTOVER** (`var_dump`/`dd`/`dump`/`console.log`/`print`/`print_r`, or `TODO`/`FIXME`/`PLACEHOLDER`/`example` you just added) → remove it; **REVIEW** (added, currently unreferenced, but matches a route/handler/command/component entry-point pattern) → keep, it is likely wired up next. The tool catches the **mechanical** slop reliably (unused additions, debug lines). It does NOT catch **semantic** slop — those you remove by reading: a comment that merely restates the next line → delete; a single-use abstraction you just invented (interface/factory/wrapper with exactly one caller) → inline it (YAGNI / Rule of Three); a helper you wrote that duplicates one your 1c.2 pre-flight grep should have found → reuse the existing one (grep the tree for it); any *new* dependency/import → confirm the package actually exists (anti-slopsquatting). This layer removes ONLY your own just-written additions; if a removal would touch anything present before this diff, stop and report instead (that is CLEANUP MODE's job, and it is report-only). **Verified-by**: paste the `--diff-slop` `SUMMARY findings=… exit=…` footer.
 
 **3e. Report.**
+
+Frame both report shapes as a cockpit verdict block (output-style T5) — lamp line per layer with compressed evidence, 20-cell layer bar, then the binding verdict line. Verified-by content and verdict definitions below stay word-for-word.
 
 Clean:
 ```

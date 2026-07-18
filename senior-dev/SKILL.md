@@ -29,8 +29,7 @@ While working: keep the card in view. Before "done": close like a senior.
 | **Large / unclear / risky** | data, auth, payment, deploy, migration — or ambiguous ask | Plan-Mode airlock (below), then full `references/senior-card.md` §A + spike decision; superpowers:brainstorming → writing-plans → code-guardian PLAN MODE |
 
 Upgrade mid-task whenever reality turns out bigger than the triage guessed.
-Never downgrade mid-task. State your class in one line before starting
-("Intake: normal — touches shared model + two views").
+Never downgrade mid-task. Announce the intake: class question/trivial → one plain line ("Intake: trivial — …"); class normal and above → render the intake card (code-guardian `references/output-style.md` T1: Klasse · Route · Tag · Beweisplan).
 
 ## §A compact — the intake (class normal and above)
 

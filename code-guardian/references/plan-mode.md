@@ -20,6 +20,8 @@ Senior view first: re-read senior-dev `references/senior-card.md` §B and answer
 
 **P7. Generalization — examples are data, never code.** When the requirement quantifies universally ("every industry", "any domain", "für jede Branche") and names example values (a domain, a date, an ID), the plan MUST name the **generic mechanism** (classifier, parser, DB/config lookup, AI analysis) and route every example value into test data or config — never into `if`/`switch`/regex/lookup control flow. A plan that enumerates the examples as cases is the overfitting anti-pattern locked in at plan-time. Genuine single-value business rules must be declared as `INTENTIONAL-SPECIAL-CASE` with the business source. *Check:* grep the plan for each example literal; every hit must be in a test/config/seed section, not in described branching logic. Full law + deletion/second-example tests: `references/generalization-gate.md`.
 
+Cockpit: present the P1–P7 run as a checklist tracker (output-style T3, PASS/FAIL marks) before writing the block below into the plan document.
+
 **Output** — append to the plan document:
 
 ```markdown

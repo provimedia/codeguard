@@ -68,6 +68,8 @@ exactly this distinction.
 Every data verdict presented (report, ticket reply, fix justification, cleanup
 list) MUST carry this block. No block → the verdict is not reportable.
 
+Cockpit: frame this report as a verdict block (output-style T5 — ━ header/footer, lamp per line item); the fields below are binding and unchanged.
+
 ```
 DATA GATE — Vollbild
 Tables inspected (live):   <table: n columns, introspection command used>

@@ -124,6 +124,8 @@ channel available → mark the report **"⚠️ Server unchecked"** (analog to
 The gate writes its result to the project root (the enforcement hook reads it;
 fresh = mtime < 30 min):
 
+Cockpit: frame this report as a verdict block (output-style T5 — ━ header/footer, lamp per line item); the fields below are binding and unchanged.
+
 ```markdown
 # Code Guardian DEPLOY GATE Report
 Date: <ISO timestamp>   Target: <host/path or URL>   Mechanism: <deploy.sh|rsync|ftp|…>

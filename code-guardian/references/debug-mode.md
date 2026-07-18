@@ -2,6 +2,8 @@
 
 > Loaded when a bug/error/broken behavior is reported. The router lives in `SKILL.md`; this file holds the full 5-phase protocol. Operating Principles (in SKILL.md) govern every phase. The 1d worklist engine and the Audit referenced below are defined once in `references/build-mode.md` — load it when a phase points there.
 
+Cockpit: render the 5-phase tracker (output-style T3) at entry and update it at each phase boundary; the final fix verdict uses the verdict block (T5).
+
 ### Phase 1: COLLECT (no fix, no suggestion yet)
 
 - **1a.** Exact symptom: error text, stack trace, expected vs actual.

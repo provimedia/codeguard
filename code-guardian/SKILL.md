@@ -34,7 +34,7 @@ description: >
   Bugs that ship are caused by skipped audits. Run the workflow EVERY TIME.
 ---
 
-# Code Guardian (v16)
+# Code Guardian (v16.2)
 
 ## Operating Principles
 
@@ -45,6 +45,7 @@ Stated once; they govern every mode below. The skill defines goals and gates —
 3. **Stay in scope — with one carve-out for your own mess.** Findings in code that existed *before this change* are *reported*, never silently fixed or deleted — no refactoring, tidying, or new abstractions beyond the task; a bug fix doesn't need surrounding cleanup. The one exception: AI-slop *this change itself* introduced (unused symbols/imports you just added, debug leftovers, redundant comments, single-use abstractions you just invented) IS in scope — strip it before "done" (the always-on Self-Slop Sweep, `references/build-mode.md` Step 3). Cleaning up pre-existing dead/orphaned/redundant code is a separate, opt-in, **report-only** path (CLEANUP MODE) that never deletes on its own.
 4. **Fan out independent work.** When items are independent — consumers to classify, audit layers to verify, hypotheses to argue — dispatch parallel subagents instead of iterating serially. Marked ⚡ in the mode files. Subagents receive: the exact check to run, the diff/symbol context, and the required output format (verdict + command output).
 5. **Write down what you learn.** `.audit-log.md` (findings & patterns), `.code-guardian-propagation.md` (open worklists for large changes). Consult both at the start of a run; keep them current. One lesson per entry, with why it mattered.
+6. **Report through the cockpit.** At phase boundaries (intake, mode entry, step completion, verdict) render the matching template from `references/output-style.md` — visuals replace the prose report they frame, never duplicate it; question/trivial tasks stay plain.
 
 ## Mode Selection
 
@@ -85,6 +86,7 @@ The full catalog lives in `references/` next to this file. Load with the Read to
 | `references/cross-layer-checks.md` | 36 cross-layer reflexes, each with audit commands + the real bug it came from | a cross-layer index trigger matches (index is in `build-mode.md` Step 3) |
 | `references/audit-deep-checks.md` | Full-depth layer checks (DB, Logic, Efficiency, Security) + R1–R5 redundancy detectors in detail | any audit layer runs at full depth |
 | `references/design-rationale.md` | rule history + council-gate rationale | only when modifying this skill itself |
+| `references/output-style.md` | Cockpit templates (intake card, mode banner, checklist tracker, worklist pulse, verdict block) + render laws | any mode or gate is about to render a report/tracker/verdict |
 
 ---
 

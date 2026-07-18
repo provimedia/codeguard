@@ -56,6 +56,8 @@ if such a constraint exists, name it in the justification.
 
 ## Binding output format
 
+Cockpit: open the recommendation with a mode banner (output-style T2, `DECISION GATE`); the numbered binding format below is unchanged.
+
 Every option question presented to the user MUST follow this shape — in
 `AskUserQuestion` calls AND in plain-text option lists:
 

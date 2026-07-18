@@ -64,6 +64,8 @@ python3 ~/.claude/skills/code-guardian/tools/detect-clones.py --root . --kind co
 
 ## Step 5 — Report (report-only; the skill does not delete)
 
+Cockpit: frame this report as a verdict block (output-style T5 — ━ header/footer, lamp per line item); the fields below are binding and unchanged.
+
 ```
 ## Cleanup Report: <scope>
 VERIFIED-DEAD-PRIVATE (human may delete; one symbol/commit, git-recoverable):
