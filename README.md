@@ -2,7 +2,7 @@
 
 A mandatory audit skill for [Claude Code](https://claude.com/claude-code) that prevents bugs by enforcing plan-time, build-time, and debug-time reflexes. Born from real bugs that escaped audits in production — every rule is backed by a concrete incident citation in `SKILL.md`.
 
-- **Version:** v15 (Data Gate Edition)
+- **Version:** v16 (Senior Mindset Edition)
 - **Platform:** macOS / Linux
 - **Languages:** English + German trigger phrases
 
@@ -122,6 +122,16 @@ No verdict about the state of data from a partial picture. The third orthogonal 
 - **V4 Innocent-explanation elimination:** "legitimate intended state (waiting/deferred/paused/gated)" is always a candidate and dies only by evidence, never by "I didn't see anything".
 - **Binding output:** every data verdict carries the **Full-Picture block** (tables inspected · state columns ruled out · rows dumped · predicate tested · verdict `DEFECT | INTENDED STATE | MIXED | INSUFFICIENT PICTURE`). No block → not reportable; no picture → `INSUFFICIENT PICTURE`, never a guess. No hook — a verdict is prose, not a tool call; the required block is the enforcement. Full protocol: `code-guardian/references/data-gate.md`.
 
+### Senior Dev Companion (v16)
+
+Code Guardian starts too late by itself — every mode fires only after a task has already been shaped. The bundled companion skill **`senior-dev`** closes that gap: loaded first on EVERY prompt via the upgraded `UserPromptSubmit` hook (previously code-triggers-only), it takes on the request as a senior full-stack developer before any other skill runs.
+
+- **Stage 0 triage (every prompt):** classifies the request as question / trivial / normal / large-or-risky and scales intake depth accordingly — a question gets no protocol, a trivial one-file change gets 3 core checks, a large/risky task (data, auth, payment, deploy, migration) gets the full senior protocol plus `superpowers:brainstorming` → `writing-plans` → PLAN MODE. Upgrading mid-task is always allowed; downgrading never.
+- **The senior card (`references/senior-card.md`, §A–§E):** the full question catalog — §A Intake, §B Architecture & design, §C While coding, §D Meta view, §E Completion — anchored back into code-guardian via one-line references in plan-mode, build-mode, and debug-mode so the questions stay active through the whole task, not just at the start.
+- **§D heartbeat:** `code-guardian-reminder.sh` (PostToolUse on Write/Edit) injects one rotating §D meta-question every 3rd counted code edit — a deterministic guardrail that survives context compaction because it does not depend on model discretion.
+- **Rule-of-Three skill proposal:** every accepted task is logged to `.task-journal.md` (type-tag, triage class, one-line goal); when the same type-tag recurs a 2nd–3rd time, the skill proposes building a dedicated skill for it — recommend + one-click approval, never built autonomously.
+- Bundled like `llm-council`, but **always updated with the package** on install/update (unlike `llm-council`, which is install-only-if-missing — senior-dev is core wiring, not a customizable companion).
+
 ---
 
 ## Repository Layout
@@ -148,6 +158,10 @@ No verdict about the state of data from a partial picture. The third orthogonal 
 │       ├── detect-dead-code.py    ← v11 report-only liveness aggregator (Self-Slop + CLEANUP MODE)
 │       ├── detect-hardcoded-cases.py ← v13 example-hardcoding detector (Generalization Gate)
 │       └── detect-deploy-artifacts.py ← v14 deploy-artifact classifier (Deploy Gate)
+├── senior-dev/
+│   ├── SKILL.md                   ← v16 companion — triage + routing + card summary
+│   └── references/
+│       └── senior-card.md         ← v16 senior question catalog (§A–§E)
 └── llm-council/
     └── SKILL.md                   ← bundled companion — powers the Council Gates
 ```
@@ -170,9 +184,9 @@ The installer will:
 - Back up any existing `code-guardian` install to `~/.claude/skills/code-guardian.backup.YYYYMMDD-HHMMSS`
 - Copy `SKILL.md` and `tools/` into `~/.claude/skills/code-guardian/`
 - Set executable bits on the helper scripts
-- Verify that the version markers are present (v15: `Code Guardian (v15)`, `DATA GATE`, `DEPLOY GATE`, …)
+- Verify that the version markers are present (v16: `Code Guardian (v16)`, `DATA GATE`, `DEPLOY GATE`, …)
 - Install the bundled `llm-council` companion into `~/.claude/skills/llm-council/` **only if it is not already present** (an existing council is left untouched unless `--force` is passed)
-- Install the three bundled hooks into `~/.claude/hooks/` and **register them in `~/.claude/settings.json` automatically** — idempotent merge with a timestamped backup; existing entries and all other keys are left untouched. Corrupt JSON or missing `python3` → the file is never touched, manual instructions are printed instead.
+- Install the four bundled hooks into `~/.claude/hooks/` and **register them in `~/.claude/settings.json` automatically** — idempotent merge with a timestamped backup; existing entries and all other keys are left untouched. Corrupt JSON or missing `python3` → the file is never touched, manual instructions are printed instead.
 - Print next steps — **restart Claude Code afterwards**: hooks are read at session start (`/hooks` to verify)
 
 ### Installer options
@@ -196,7 +210,7 @@ The installer will:
 3. Confirm all version markers are loaded:
 
    ```bash
-   grep -cE "Code Guardian \(v15\)|DATA GATE|DEPLOY GATE|DECISION GATE|CLEANUP MODE" \
+   grep -cE "Code Guardian \(v16\)|DATA GATE|DEPLOY GATE|DECISION GATE|CLEANUP MODE" \
        ~/.claude/skills/code-guardian/SKILL.md    # → > 0 matches per marker
    ls ~/.claude/skills/code-guardian/references/  # → 11 .md files (incl. data-gate.md)
    ```
@@ -299,6 +313,7 @@ Deterministic enforcement of the DEPLOY GATE: a `PreToolUse` hook on **Bash** th
 
 ## Version History
 
+- **v16** (2026-07) — Senior Dev Companion. New bundled companion skill `senior-dev`: loaded first on every prompt via the upgraded `code-guardian-prompt-check.sh` hook (now fires on EVERY prompt, not just code triggers), taking on the request as a senior full-stack developer before any mode runs. Stage 0 triage (question/trivial/normal/large) scales intake depth; `references/senior-card.md` carries the full §A–§E senior question catalog (Intake, Architecture & design, While coding, Meta view, Completion), anchored into plan-mode/build-mode/debug-mode via one-line references so the questions stay active through the whole task. §D heartbeat: `code-guardian-reminder.sh` now injects a rotating senior meta-question every 3rd counted code edit — a deterministic guardrail independent of model discretion. Rule-of-Three skill proposal via `.task-journal.md` (recommend + one-click approval, never built autonomously). `install.sh` bundles `senior-dev` alongside `llm-council`, but always updates it with the package (unlike `llm-council`, which installs only if missing).
 - **v15** (2026-07) — Data Gate. Third orthogonal gate: no data-state verdict ("verwaist", "stuck", "nie bearbeitet") and no data-based fix/migration/cleanup/report without the full live picture. V1 live schema inventory of every involved table + one FK hop (state-carrying columns: deferral dates, validity windows, flags, soft-delete) · V2 `SELECT *` row reality with healthy-sibling diff · V3 processor-predicate cross-check (handed-down criteria are hypotheses) · V4 innocent-explanation elimination with evidence. Binding Full-Picture block on every data verdict incl. honest `INSUFFICIENT PICTURE`; the law: absence of activity never proves broken data (liveness asymmetry applied to data). New `references/data-gate.md`, DEBUG MODE wiring (Phase 1e + mandatory Phase-2 candidate). Born from a real `deadline_ab` misdiagnosis; validated via TDD fixture scenarios (bug-shaped + analysis-shaped with authority-supplied wrong criterion). No hook — verdicts are prose; the required block is the enforcement.
 - **v14** (2026-07) — Deploy Gate. Second orthogonal gate: no file reaches an external server unclassified. 4-class law (DEPLOY / SERVER-ONLY / NEVER-ON-SERVER[high|low] / REVIEW; transfer and existence are independent dimensions), D1 manifest check on the real transfer list, D2 durable committed excludes, D3 server retro-check (HTTP probes + SSH find; SERVER-ONLY reachable over HTTP = webserver fix, never deletion), D4 leftover removal only after ONE user approval with re-probe verification. New `references/deploy-gate.md`, report-only classifier `tools/detect-deploy-artifacts.py` (data-table catalogs, `.code-guardian-deploy.yml` overrides), fourth hook `deploy-gate-check.sh` (PreToolUse on Bash, dry-run/local/non-prod carve-outs). Validated against `test/deploy/` + 15-case hook matrix.
 - **v13** (2026-07) — Generalization Gate. The examples-are-data law (no example literal from a universally-quantified requirement in `if`/`switch`/regex/lookup control flow), deletion + second-example tests, PLAN reflex P7, Logic-layer + Self-Slop integration, and the report-only detector `tools/detect-hardcoded-cases.py` (decision-context heuristic, `--examples`, `--git` diff mode, `INTENTIONAL-SPECIAL-CASE` escape hatch). Validated against `test/hardcoding/`: 9/9 traps flagged, 0 false positives on clean cases.

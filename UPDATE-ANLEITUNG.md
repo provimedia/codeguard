@@ -1,9 +1,11 @@
-# Code Guardian v15 — Update-Anleitung
+# Code Guardian v16 — Update-Anleitung
 
-Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v15**,
-installiert den gebündelten **llm-council**-Companion mit und richtet die
-**Hooks automatisch** ein — inklusive DECISION GATE und DEPLOY GATE. Neu in
-v15: das **DATA GATE** (Vollbild-Pflicht vor jedem Daten-Verdikt).
+Dieses Paket aktualisiert den Code-Guardian-Skill für Claude Code auf **v16**,
+installiert die gebündelten Companion-Skills **llm-council** und **senior-dev**
+mit und richtet die **Hooks automatisch** ein — inklusive DECISION GATE und
+DEPLOY GATE. Neu in v16: der **Senior Dev Companion** (`senior-dev`) — er lädt
+bei jeder Eingabe zuerst und sorgt für Task-Intake plus einen durchgehenden
+Senior-Mindset.
 
 ## Was ist neu seit v10
 
@@ -99,10 +101,38 @@ v15: das **DATA GATE** (Vollbild-Pflicht vor jedem Daten-Verdikt).
   Pflicht-Kandidat in Phase 2). **Kein neuer Hook** — ein Verdikt ist Prosa,
   kein Tool-Call; der Pflicht-Block selbst ist die Durchsetzung.
 
+### v16 — Senior Dev Companion
+
+- **Task-Intake bei JEDER Eingabe:** Der `UserPromptSubmit`-Hook
+  (`code-guardian-prompt-check.sh`) feuert jetzt nicht mehr nur bei
+  Code-/Bug-Prompts, sondern bei jedem Prompt und lässt zuerst den neuen
+  Companion-Skill **`senior-dev`** laden. Der übernimmt die Anfrage als
+  Senior-Fullstack-Entwickler: Triage in **question / trivial / normal /
+  large**, die Intake-Tiefe skaliert mit der Klasse (Frage: keine Prüfung,
+  trivial: 3 Kernchecks, groß/riskant: volles Senior-Protokoll plus
+  `superpowers:brainstorming` → `writing-plans` → PLAN MODE); erst danach
+  wird in code-guardian bzw. superpowers geroutet.
+- **Der Senior-Fragenkatalog (`references/senior-card.md`, §A–§E):** §A
+  Intake, §B Architektur & Design, §C beim Coden, §D Meta-Blick, §E
+  Abschluss — per Einzeiler in PLAN-, BUILD- und DEBUG-Mode verankert, damit
+  die Fragen während der ganzen Aufgabe aktiv bleiben, nicht nur am Anfang.
+- **§D-Heartbeat:** `code-guardian-reminder.sh` injiziert jetzt bei jedem
+  3. gezählten Code-Edit rotierend eine der §D-Meta-Fragen — ein
+  deterministischer Reflex, der nicht vom Modell-Ermessen abhängt und auch
+  eine Context-Kompaktierung übersteht.
+- **Rule-of-Three-Skill-Vorschlag:** Jede angenommene Aufgabe wird in
+  `.task-journal.md` protokolliert (Typ-Tag, Triage-Klasse, Ein-Zeiler-Ziel).
+  Taucht derselbe Typ-Tag zum 2.–3. Mal auf, schlägt der Skill vor, dafür
+  einen eigenen Skill zu bauen — Empfehlung + 1-Klick-Freigabe, nie autonom
+  gebaut.
+- `install.sh` installiert `senior-dev` gebündelt wie `llm-council` — aber
+  anders als `llm-council` (nur installiert, wenn noch keiner vorhanden ist)
+  wird `senior-dev` bei jedem Update immer mit dem Paket aktualisiert.
+
 ## Schritt 1 — Installieren (EIN Befehl, macht alles)
 
 ```bash
-unzip code-guardian-v15-update.zip -d code-guardian-v15 && cd code-guardian-v15
+unzip code-guardian-v16-update.zip -d code-guardian-v16 && cd code-guardian-v16
 ./install.sh
 ```
 
@@ -110,8 +140,10 @@ Der Installer erledigt jetzt ALLES selbst:
 
 1. Backup der bestehenden Skill-Installation nach
    `~/.claude/skill-backups/code-guardian.backup.<timestamp>/`
-2. Skill v15 nach `~/.claude/skills/code-guardian/`
-3. `llm-council` nach `~/.claude/skills/llm-council/` (nur falls fehlt)
+2. Skill v16 nach `~/.claude/skills/code-guardian/`
+3. `llm-council` nach `~/.claude/skills/llm-council/` (nur falls fehlt) und
+   `senior-dev` nach `~/.claude/skills/senior-dev/` (**NEU**, wird bei jedem
+   Update immer mit installiert)
 4. Die 4 Hooks nach `~/.claude/hooks/` (werden bei Updates überschrieben):
    - `code-guardian-prompt-check.sh` — Skill-Reminder bei Code-/Bug-Prompts
    - `code-guardian-reminder.sh` — Audit-Reminder nach jedem Write/Edit
@@ -145,11 +177,12 @@ Unter `/hooks` müssen erscheinen:
 ## Schritt 3 — Verifizieren
 
 ```bash
-grep -m1 "Code Guardian (v15)" ~/.claude/skills/code-guardian/SKILL.md   # → Treffer
+grep -m1 "Code Guardian (v16)" ~/.claude/skills/code-guardian/SKILL.md   # → Treffer
 grep -m1 "DATA GATE" ~/.claude/skills/code-guardian/SKILL.md             # → Treffer
 ls ~/.claude/skills/code-guardian/references/   # → 11 .md-Dateien (inkl. data-gate.md)
 ls ~/.claude/skills/code-guardian/tools/        # → 7 Skripte (inkl. detect-deploy-artifacts.py)
 ls ~/.claude/skills/llm-council/SKILL.md        # → vorhanden
+grep -m1 "name: senior-dev" ~/.claude/skills/senior-dev/SKILL.md         # → Treffer
 ls -l ~/.claude/hooks/deploy-gate-check.sh      # → -rwxr-xr-x
 
 # Hook-Funktionstest DECISION GATE (muss eine deny-JSON-Zeile ausgeben):
@@ -161,8 +194,8 @@ echo '{"tool_input":{"command":"rsync -avz ./ user@server.de:/var/www/html/"}}' 
   | ~/.claude/hooks/deploy-gate-check.sh
 ```
 
-Der Installer prüft die v15-Marker selbst und meldet
-`v15 markers + symbol-loss + dead-code + decision + generalization + deploy + data gates detected`.
+Der Installer prüft die v16-Marker selbst und meldet
+`v16 markers + senior-dev anchor + symbol-loss + dead-code + decision + generalization + deploy + data gates detected`.
 
 ## Voraussetzungen
 
@@ -178,4 +211,4 @@ Der Installer prüft die v15-Marker selbst und meldet
 - Hooks/Settings: `~/.claude/settings.json.backup-code-guardian.<timestamp>`
   zurückkopieren; Hook-Skripte in `~/.claude/hooks/` ggf. löschen.
 
-Stand: 18.07.2026 (v15) · Fragen an Alex
+Stand: 18.07.2026 (v16) · Fragen an Alex
