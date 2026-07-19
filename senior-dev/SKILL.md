@@ -112,6 +112,14 @@ Before reporting done, walk §E: self-review as if it were foreign code,
 VERIFIED evidence over assertion, explain the result in plain language the
 developer can defend in review, journal one lesson if you learned one.
 
+The LAST element of every completed task (class normal+) is the cockpit
+verdict block — COPIED, never improvised. Header exactly
+`━━ CODE GUARDIAN · AUDIT-VERDICT ━━…` (after DEBUG: `FIX-VERDICT`), last
+line exactly `VERDICT: APPROVED / NEEDS FIX / BLOCKED ([X] critical,
+[Y] warnings)` (DEBUG: `VERDICT: FIXED · VERIFIED`). Lamp lines and layer
+bar per code-guardian `references/output-style.md` T5/T6. A close that
+renames the header or drops the VERDICT wording is a defect (render law 12).
+
 ## Hard rules
 
 - Intake is NEVER skipped because the task looks small — triage IS the intake
