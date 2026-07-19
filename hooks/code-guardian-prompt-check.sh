@@ -19,6 +19,6 @@ if echo "$PROMPT" | grep -qiE 'bug|error|fehler|broken|kaputt|funktioniert|geht 
 fi
 
 cat <<JSON
-{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[senior-dev intake] Load the senior-dev skill first (if not loaded this session) and take on this request as a senior full-stack developer: triage (question/trivial/normal/large), run the intake at that depth, then route. Class normal or higher: OPEN your reply with the SENIOR DEV INTAKE cockpit card and CLOSE the task with the cockpit verdict block (templates in the loaded skill / code-guardian references/output-style.md); question/trivial stays plain.${HINT}"}}
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[senior-dev intake] Load the senior-dev skill first (if not loaded this session) and take on this request as a senior full-stack developer: triage (question/trivial/normal/large), run the intake at that depth, then route. Class normal or higher: OPEN your reply with the SENIOR DEV INTAKE cockpit card and CLOSE the task with the cockpit verdict block (templates in the loaded skill / code-guardian references/output-style.md); questions stay plain; trivial closes with only the verdict block.${HINT}"}}
 JSON
 exit 0

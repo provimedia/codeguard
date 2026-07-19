@@ -29,9 +29,11 @@
    state. A normal task shows a handful of cockpit elements, not dozens.
 9. A cockpit element REPLACES the prose report it frames — never render
    both the plain version and the cockpit version of the same content.
-10. Proportionality: question and trivial tasks get NO cockpit — a plain
-    line beats a ceremonial frame (same law as triage depth and the
-    airlock).
+10. Proportionality: questions get NO cockpit at all. Trivial tasks get no
+    intake card, no banner, no tracker — ONLY the closing verdict block
+    (clean shape) is allowed, so every piece of work still ends with the
+    same visual full stop. A plain line beats a ceremonial frame everywhere
+    else (same law as triage depth and the airlock).
 11. Before sending: eyeball the fence — bars stacked? counts aligned? A
     crooked frame is worse than no frame.
 
