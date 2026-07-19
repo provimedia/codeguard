@@ -36,6 +36,12 @@
     else (same law as triage depth and the airlock).
 11. Before sending: eyeball the fence — bars stacked? counts aligned? A
     crooked frame is worse than no frame.
+12. Template fidelity: T-blocks are COPIED, not re-invented. Header text
+    (`AUDIT-VERDICT`, `FIX-VERDICT`, `INTAKE`), the Layer bar, and the
+    VERDICT line wording (`VERDICT: APPROVED / NEEDS FIX / BLOCKED
+    ([X] critical, [Y] warnings)` — a binding rule from build-mode 3e)
+    are fixed; only the content lines vary. An improvised frame that
+    drops the binding verdict wording is a defect, not a style choice.
 
 ## T1 — Intake card (senior-dev, class normal and above)
 
