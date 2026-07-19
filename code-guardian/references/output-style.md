@@ -94,3 +94,20 @@ Each lamp line carries the compressed Verified-by evidence; the full
 Verified-by command outputs stay in the surrounding report as before.
 Verdict wording (`APPROVED` / `NEEDS FIX` / `BLOCKED` + counts) is the
 binding rule from build-mode 3e, unchanged.
+
+## T6 — Debug fix verdict (DEBUG MODE Phase 5 close)
+
+```
+━━ CODE GUARDIAN · FIX-VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Root cause   [what, in one line]
+  Fix          [old] → [new]              [N lines]
+  Proof        [repro test red→green + suite result]
+  Blast radius [consumers checked, one line]
+
+  VERDICT: FIXED · VERIFIED  |  NOT FIXED: [reason]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Root-cause and evidence prose come BEFORE the block; the block is the last
+word. Field labels left-aligned to one column; no lamps here — a fix is
+binary (FIXED · VERIFIED or NOT FIXED), the audit lamps live in T5.
